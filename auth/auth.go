@@ -23,7 +23,7 @@ func (e UsernameNotFoundError) Error() string {
 }
 
 func NewUsernameNotFoundError(m string) error {
-	s := errors.StackTrace()
+	_, s := errors.StackTrace()
 	return UsernameNotFoundError{m, s} 
 }
 
@@ -46,7 +46,7 @@ func (e NotAuthorizedError) Error() string {
 }
 
 func NewNotAuthorizedError(m string) error {
-	s := errors.StackTrace()
+	_, s := errors.StackTrace()
 	return NotAuthorizedError{m, s} 
 }
 

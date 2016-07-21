@@ -58,7 +58,7 @@ type Router struct {
 	Middlewares []Middleware
 	MiddlewaresMap MiddlewaresMap
 	
-	AfterHandlers []AfterHandler
+	ErrorHandler ErrorHandler
 }
 
 type Routes map[string][]*Route
@@ -70,8 +70,8 @@ func NewRouter() *Router {
 	}
 }
 
-func (r *Router) AddAfterHandler(a AfterHandler) {
-	r.AfterHandlers = append(r.AfterHandlers, a)
+func (r *Router) SetErrorHandler(e ErrorHandler) {
+	r.ErrorHandler = e
 }
 
 func (router *Router) AddRoutes(group string, newRoutes ...*Route) {
@@ -105,11 +105,8 @@ type Handler interface {
 
 type HandlerFunc func(http.ResponseWriter, *http.Request) (Response, error)
 
-func (r *Router) applyAfterHandlers(h HandlerFunc) HandlerFunc {
-	for i := len(r.AfterHandlers) - 1; i >= 0; i-- {
-		h = r.AfterHandlers[i](h)
-	}
-	return h
+func (r *Router) applyErrorHandler(h HandlerFunc) HandlerFunc {
+	return r.ErrorHandler(h)
 }
 
 func (r *Router) responseMiddleware(h HandlerFunc) http.HandlerFunc {
@@ -158,7 +155,7 @@ func (router *Router) Start() {
 			}
 
 			handler := router.responseMiddleware(
-				router.applyAfterHandlers(route.Handler))
+				router.applyErrorHandler(route.Handler))
 
 			route.Method(route.Path, HttpRouterWrapHandler(chain.Then(handler)))
 		}
@@ -213,7 +210,7 @@ func (m *MiddlewareManager) Add(token string, constructor alice.Constructor) {
 	m.Middlewares = append(m.Middlewares, Middleware{token, constructor})
 }
 
-type AfterHandler func(HandlerFunc) HandlerFunc
+type ErrorHandler func(HandlerFunc) HandlerFunc
 
 func JsonAcceptMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -291,23 +288,23 @@ func JsonError(status int, message ...string) ([]byte, error) {
 	return json.Marshal(&Error{status, message})
 }
 
-type System struct {
+type Module struct {
 	ContextPath string
 }
 
-func (system System) NewRoute(token string, m HttpMethod, path string, h Handler) *Route {
+func (module Module) NewRoute(token string, m HttpMethod, path string, h Handler) *Route {
 	contextPath := ""
 	
-	if (system.ContextPath != "") {
-		contextPath = system.ContextPath
+	if (module.ContextPath != "") {
+		contextPath = module.ContextPath
 	}
 	
 	return NewRoute(token, m, contextPath + path, h)
 }
 
-func SetContextPath(contextPath string, systems ...*System) {
-	for _, system := range systems {
-		system.ContextPath = contextPath
+func SetContextPath(contextPath string, modules ...*Module) {
+	for _, module := range modules {
+		module.ContextPath = contextPath
 	}
 }
 
