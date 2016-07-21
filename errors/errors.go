@@ -1,7 +1,8 @@
 package errors
 
 import (
-	"github.com/dropbox/godropbox/errors"
+	"bytes"
+	"runtime"
 ) 
 
 type RuntimeError interface {
@@ -28,7 +29,7 @@ func (e Error) Error() string {
 }
 
 func New(m string) error {
-	s, _ := errors.StackTrace()
+	s, _ := StackTrace()
 	return Error{m, s} 
 }
 
@@ -51,7 +52,7 @@ func (e NotFoundError) Error() string {
 }
 
 func NewNotFoundError(m string) error {
-	s, _ := errors.StackTrace()
+	s, _ := StackTrace()
 	return NotFoundError{m, s} 
 }
 
@@ -74,7 +75,7 @@ func (e IllegalStateError) Error() string {
 }
 
 func NewIllegalStateError(m string) error {
-	s, _ := errors.StackTrace()
+	s, _ := StackTrace()
 	return IllegalStateError{m, s} 
 }
 
@@ -97,7 +98,7 @@ func (e RelationshipError) Error() string {
 }
 
 func NewRelationshipError(m string) error {
-	s, _ := errors.StackTrace()
+	s, _ := StackTrace()
 	return RelationshipError{m, s} 
 }
 
@@ -106,7 +107,55 @@ func IsRelationshipError(e error) bool {
 	return ok
 }
 
-func StackTrace() string {
-	stack, _ := errors.StackTrace()
-	return stack
+func stackTrace(skip int) (current, context string) {
+	buf := make([]byte, 128)
+	for {
+		n := runtime.Stack(buf, false)
+		if n < len(buf) {
+			buf = buf[:n]
+			break
+		}
+		buf = make([]byte, len(buf)*2)
+	}
+
+	indexNewline := func(b []byte, start int) int {
+		if start >= len(b) {
+			return len(b)
+		}
+		searchBuf := b[start:]
+		index := bytes.IndexByte(searchBuf, '\n')
+		if index == -1 {
+			return len(b)
+		}
+		return (start + index)
+	}
+
+	var strippedBuf bytes.Buffer
+	index := indexNewline(buf, 0)
+	if index != -1 {
+		strippedBuf.Write(buf[:index])
+	}
+
+	for i := 0; i < skip; i++ {
+		index = indexNewline(buf, index+1)
+		index = indexNewline(buf, index+1)
+	}
+
+	isDone := false
+	startIndex := index
+	lastIndex := index
+	for !isDone {
+		index = indexNewline(buf, index+1)
+		if (index - lastIndex) <= 1 {
+			isDone = true
+		} else {
+			lastIndex = index
+		}
+	}
+	strippedBuf.Write(buf[startIndex:index])
+	return strippedBuf.String(), string(buf[index:])
+}
+
+func StackTrace() (current, context string) {
+	return stackTrace(3)
 }
