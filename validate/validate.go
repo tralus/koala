@@ -1,16 +1,19 @@
 package validate
 
 import (
+	"reflect"
+	"errors"
 	"strings"
 	"sort"
 	"fmt"
 	"strconv"
 	"encoding/json"
-	
-	"gopkg.in/go-playground/validator.v8"
+	"unicode/utf8"
 )
 
-const NOT_EMPTY_MSG = "The '%s' can not be empty"
+var ErrUnsupported = errors.New("Unsupported type")
+
+const NOT_ZERO_MSG = "The '%s' can not be zero"
 
 const IS_EMAIL_MSG = "The '%s' value is not a valid email"
 
@@ -19,8 +22,6 @@ const MIN_LENGTH_MSG = "The '%s' length value is lesser than %d"
 const EQ_CHOICE_MSG = "The '%s' value is not equal to %s"
 
 const IS_JSON_MSG = "The '%s' value is not a valid json"
-
-var validate *validator.Validate
 
 func IsValidationContextError(err error) bool {
 	_, ok := err.(ContextValidationError)
@@ -84,22 +85,6 @@ func (c Context) Check(errors ...error) error {
 
 func NewPropertyError(property string, msg string) PropertyError {
 	return PropertyError{property, msg}
-}
-
-func Property(property string, v interface{}, tags string, f string, e ...interface{}) error {
-	err := validate.Field(v, tags)
-	
-	var values []interface{}
-	
-	values = append(values, property)
-	
-	message := fmt.Sprintf(f, append(values, e...)...)
-	
-	if (err != nil) {
-		return NewPropertyError(property, message)
-	}
-	
-	return nil
 }
 
 type ChoicesString map[string]string
@@ -178,15 +163,53 @@ func EqChoiceInt(property string, v int, choices ChoicesInt) error {
 	return nil
 }
 
-func NotEmpty(property string, v interface{}) error {
-	return Property(property, v, "required", NOT_EMPTY_MSG)
+func NotZero(property string, v interface{}) error {
+	st := reflect.ValueOf(v)
+	valid := true
+	
+	switch st.Kind() {
+	case reflect.String:
+		valid = len(st.String()) != 0
+		
+	case reflect.Ptr, reflect.Interface:
+		valid = !st.IsNil()
+		
+	case reflect.Slice, reflect.Map, reflect.Array:
+		valid = st.Len() != 0
+		
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		valid = st.Int() != 0
+		
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		valid = st.Uint() != 0
+		
+	case reflect.Float32, reflect.Float64:
+		valid = st.Float() != 0
+		
+	case reflect.Bool:
+		valid = st.Bool()
+		
+	case reflect.Invalid:
+		valid = false // always invalid
+		
+	case reflect.Struct:
+		valid = true // always valid since only nil pointers are empty
+		
+	default:
+		return ErrUnsupported
+	}
+
+	if !valid {
+		return NewPropertyError(property, fmt.Sprintf(NOT_ZERO_MSG, property))
+	}
+	
+	return nil
 }
 
 func IsEmail(property string, v string) error {
-	if (len(v) > 0) {
-		return Property(property, v, "email", IS_EMAIL_MSG)
+	if !emailRegex.MatchString(v) {
+		return NewPropertyError(property, fmt.Sprintf(IS_EMAIL_MSG, property))
 	}
-	
 	return nil
 }
 
@@ -194,27 +217,16 @@ func IsJson(property string, v string) error {
 	var js map[string]interface{}
 	
 	if err := json.Unmarshal([]byte(v), &js); err != nil {
-		var values []interface{}
-	
-		values = append(values, property)
-		
-		message := fmt.Sprintf(IS_JSON_MSG, values...)
-		
-		return NewPropertyError(property, message) 
+		return NewPropertyError(property, fmt.Sprintf(IS_JSON_MSG, v)) 
 	}
 	
 	return nil
 }
 
-func MinLength(property string, v string, min int) error {
-	if (len(v) > 0) {
-		tags := "min=" + strconv.Itoa(min)
-		return Property(property, v, tags, MIN_LENGTH_MSG, min)
+func MinStrLength(property string, v string, min int) error {
+	if (utf8.RuneCountInString(v) > min) {
+		return NewPropertyError(property, fmt.Sprintf(MIN_LENGTH_MSG, property, min))
 	}
 	
 	return nil
-}
-
-func init() {
-	validate = validator.New(&validator.Config{TagName: "validate"})
 }
