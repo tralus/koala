@@ -224,7 +224,7 @@ func IsJson(property string, v string) error {
 }
 
 func MinStrLength(property string, v string, min int) error {
-	if (utf8.RuneCountInString(v) > min) {
+	if (utf8.RuneCountInString(v) < min) {
 		return NewPropertyError(property, fmt.Sprintf(MIN_LENGTH_MSG, property, min))
 	}
 	

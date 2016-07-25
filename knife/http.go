@@ -52,13 +52,12 @@ type HttpMethod func(string, httprouter.Handle)
 type Router struct {
 	*httprouter.Router
 	
-	Debug bool
 	Routes map[string][]*Route
 	
-	Middlewares []Middleware
-	MiddlewaresMap MiddlewaresMap
+	middlewares []Middleware
+	middlewaresMap MiddlewaresMap
 	
-	ErrorHandler ErrorHandler
+	errorHandler ErrorHandler
 }
 
 type Routes map[string][]*Route
@@ -71,11 +70,19 @@ func NewRouter() *Router {
 }
 
 func (r *Router) SetErrorHandler(e ErrorHandler) {
-	r.ErrorHandler = e
+	r.errorHandler = e
 }
 
-func (router *Router) AddRoutes(group string, newRoutes ...*Route) {
-	oldRoutes := router.Routes[group]
+func (r *Router) SetMiddlewares(m []Middleware) {
+	r.middlewares = m
+}
+
+func (r *Router) SetMiddlewaresMap(m MiddlewaresMap) {
+	r.middlewaresMap = m
+}
+
+func (r *Router) AddRoutes(group string, newRoutes ...*Route) {
+	oldRoutes := r.Routes[group]
 	
 	for _, newRoute := range newRoutes {
 		for _, oldRoute := range oldRoutes {
@@ -87,7 +94,7 @@ func (router *Router) AddRoutes(group string, newRoutes ...*Route) {
 		newRoute.Token = group + "." + newRoute.Token
 	}
 	
-	router.Routes[group] = append(oldRoutes, newRoutes...)
+	r.Routes[group] = append(oldRoutes, newRoutes...)
 }
 
 type Response struct {
@@ -106,7 +113,7 @@ type Handler interface {
 type HandlerFunc func(http.ResponseWriter, *http.Request) (Response, error)
 
 func (r *Router) applyErrorHandler(h HandlerFunc) HandlerFunc {
-	return r.ErrorHandler(h)
+	return r.errorHandler(h)
 }
 
 func (r *Router) responseMiddleware(h HandlerFunc) http.HandlerFunc {
@@ -131,12 +138,12 @@ func (r *Router) responseMiddleware(h HandlerFunc) http.HandlerFunc {
     }
 }
 
-func (router *Router) Start() {
+func (router *Router) Initialize() {
 	for _, routes := range router.Routes {
 		for _, route := range routes {
-			middlewares := router.Middlewares
+			middlewares := router.middlewares
 			
-			middlewaresMap := router.MiddlewaresMap
+			middlewaresMap := router.middlewaresMap
 			
 			chain := alice.New(context.ClearHandler)
 			
