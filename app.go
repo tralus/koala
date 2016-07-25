@@ -1,15 +1,14 @@
 package koala
 
 import (
-	"github.com/tralus/koala/knife"
 )
 
 type AppModule interface {
-	Load(router *knife.Router)
+	Up()
 }
 
-func LoadAppModules(router *knife.Router, modules ...AppModule) {
+func UpAppModules(modules ...AppModule) {
 	for _, module:= range modules {
-		module.Load(router)
+		module.Up()
 	}
 }

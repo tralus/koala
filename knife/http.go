@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"encoding/json"
 	"time"
+	"strings"
 	
 	"github.com/julienschmidt/httprouter"
 	"github.com/justinas/alice"
@@ -52,7 +53,7 @@ type HttpMethod func(string, httprouter.Handle)
 type Router struct {
 	*httprouter.Router
 	
-	Routes map[string][]*Route
+	routes Routes
 	
 	middlewares []Middleware
 	middlewaresMap MiddlewaresMap
@@ -65,7 +66,7 @@ type Routes map[string][]*Route
 func NewRouter() *Router {
 	return &Router{
 		Router: httprouter.New(),
-		Routes: make(Routes),
+		routes: make(Routes),
 	}
 }
 
@@ -82,7 +83,7 @@ func (r *Router) SetMiddlewaresMap(m MiddlewaresMap) {
 }
 
 func (r *Router) AddRoutes(group string, newRoutes ...*Route) {
-	oldRoutes := r.Routes[group]
+	oldRoutes := r.routes[group]
 	
 	for _, newRoute := range newRoutes {
 		for _, oldRoute := range oldRoutes {
@@ -94,7 +95,35 @@ func (r *Router) AddRoutes(group string, newRoutes ...*Route) {
 		newRoute.Token = group + "." + newRoute.Token
 	}
 	
-	r.Routes[group] = append(oldRoutes, newRoutes...)
+	r.routes[group] = append(oldRoutes, newRoutes...)
+}
+
+func (r *Router) GET(token string, path string, h Handler) *Route {
+	return NewRoute(token, r.Router.GET, path, h)
+}
+
+func (r *Router) POST(token string, path string, h Handler) *Route {
+	return NewRoute(token, r.Router.POST, path, h)
+}
+
+func (r *Router) DELETE(token string, path string, h Handler) *Route {
+	return NewRoute(token, r.Router.DELETE, path, h)
+}
+
+func (r *Router) PUT(token string, path string, h Handler) *Route {
+	return NewRoute(token, r.Router.PUT, path, h)
+}
+
+func (r *Router) PATCH(token string, path string, h Handler) *Route {
+	return NewRoute(token, r.Router.PATCH, path, h)
+}
+
+func (r *Router) OPTIONS(token string, path string, h Handler) *Route {
+	return NewRoute(token, r.Router.OPTIONS, path, h)
+}
+
+func (r *Router) HEAD(token string, path string, h Handler) *Route {
+	return NewRoute(token, r.Router.HEAD, path, h)
 }
 
 type Response struct {
@@ -139,7 +168,7 @@ func (r *Router) responseMiddleware(h HandlerFunc) http.HandlerFunc {
 }
 
 func (router *Router) Initialize() {
-	for _, routes := range router.Routes {
+	for _, routes := range router.routes {
 		for _, route := range routes {
 			middlewares := router.middlewares
 			
@@ -296,23 +325,25 @@ func JsonError(status int, message ...string) ([]byte, error) {
 }
 
 type Module struct {
-	ContextPath string
+	contextPath string
 }
 
-func (module Module) NewRoute(token string, m HttpMethod, path string, h Handler) *Route {
-	contextPath := ""
-	
-	if (module.ContextPath != "") {
-		contextPath = module.ContextPath
-	}
-	
-	return NewRoute(token, m, contextPath + path, h)
+func (m *Module) SetContextPath(path string) {
+	m.contextPath = path
 }
 
-func SetContextPath(contextPath string, modules ...*Module) {
-	for _, module := range modules {
-		module.ContextPath = contextPath
+func (m *Module) Url(url string) string {
+	rootPath := m.contextPath
+	
+	if len(rootPath) > 0 && 
+		!strings.HasSuffix(rootPath, "/") &&
+		!strings.HasPrefix(url, "/") {
+		
+		rootPath = rootPath + "/"
+		
 	}
+		
+	return rootPath + url
 }
 
 type JsonUnMarshalError struct {
