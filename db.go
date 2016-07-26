@@ -9,12 +9,14 @@ type DB struct {
 }
 
 // It creates a new DB instance
-func NewDB(config DBConfig) DB {
-	return DB{config}
+func NewDB(config DBConfig) *DB {
+	return &DB{config}
 }
 
 // It connects to database
-func (db *DB) Connect(config DBConfig) (*sqlx.DB, error) {
+func (db *DB) Connect() (*sqlx.DB, error) {
+	config := db.DBConfig
+	
 	sqlxdb, err := sqlx.Connect(config.Driver, config.Datasource)
 	
 	db.Configure(sqlxdb)

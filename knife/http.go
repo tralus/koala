@@ -189,9 +189,15 @@ func (router *Router) Initialize() {
 					chain = chain.Append(middleware.Constructor)
 				}
 			}
+			
+			var handler http.HandlerFunc
 
-			handler := router.responseMiddleware(
-				router.applyErrorHandler(route.Handler))
+			if router.errorHandler != nil {
+				handler = router.responseMiddleware(
+					router.applyErrorHandler(route.Handler))
+			} else {
+				handler = router.responseMiddleware(route.Handler)
+			}
 
 			route.Method(route.Path, HttpRouterWrapHandler(chain.Then(handler)))
 		}
@@ -325,15 +331,15 @@ func JsonError(status int, message ...string) ([]byte, error) {
 }
 
 type Module struct {
-	contextPath string
+	rootPath string
 }
 
-func (m *Module) SetContextPath(path string) {
-	m.contextPath = path
+func (m *Module) SetRootPath(path string) {
+	m.rootPath = path
 }
 
 func (m *Module) Url(url string) string {
-	rootPath := m.contextPath
+	rootPath := m.rootPath
 	
 	if len(rootPath) > 0 && 
 		!strings.HasSuffix(rootPath, "/") &&

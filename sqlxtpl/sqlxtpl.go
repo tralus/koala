@@ -4,33 +4,34 @@ import (
 	"database/sql"
 	
 	"github.com/jmoiron/sqlx"
+	"github.com/tralus/koala/errors"
 )
 
 // Generic error type for database aspects
-type DataBaseError struct {
+type DatabaseError struct {
 	Msg string
 	Stack string
 }
 
 // RuntimeError interface
-func (e DataBaseError) GetStack() string {
+func (e DatabaseError) GetStack() string {
 	return e.Stack
 }
 
 // RuntimeError interface
-func (e DataBaseError) Error() string {
+func (e DatabaseError) Error() string {
 	return e.Msg
 }
 
 // It creates a new DataBaseError instance
-func NewDataBaseError(m string) error {
-	s, _ := StackTrace()
-	return DataBaseError{m, s} 
+func NewDatabaseError(m string) error {
+	s, _ := errors.StackTrace()
+	return DatabaseError{m, s} 
 }
 
 // It verifies if error is an DataBaseError type
-func IsDataBaseError(e error) bool {
-	_, ok := e.(DataBaseError)
+func IsDatabaseError(e error) bool {
+	_, ok := e.(DatabaseError)
 	return ok
 }
 
