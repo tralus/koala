@@ -7,20 +7,26 @@ import (
 	"github.com/gorilla/sessions"
 )
 
+// It creates a new session cookie store
+// This session is used to add the token on cookie
 func NewSessionCookie(c SessionConfig) *sessions.CookieStore {
 	return sessions.NewCookieStore([]byte(c.Secret))
 }
 
 const AUTH_COOKIE = "sid"
 
+// AuthTokenStore is an auth token storage
+// It accesses the session cookie and wrap the needed logic to save, get and clear the storage
 type AuthTokenStore struct {
 	Store sessions.Store
 }
 
+// It creates a new auth token store
 func NewAuthTokenStore(s sessions.Store) AuthTokenStore {
 	return AuthTokenStore{s}
 }
 
+// It saves the token on session cookie
 func (j AuthTokenStore) Save(r *http.Request, w http.ResponseWriter, token Token) error {
 	s, err := j.Store.Get(r, AUTH_COOKIE)
 	
@@ -39,6 +45,7 @@ func (j AuthTokenStore) Save(r *http.Request, w http.ResponseWriter, token Token
 	return s.Save(r, w)
 }
 
+// It gets the token on session cookie
 func (j AuthTokenStore) Get(r *http.Request) (Token, bool) {
 	var token Token
 	
@@ -55,6 +62,7 @@ func (j AuthTokenStore) Get(r *http.Request) (Token, bool) {
     return token, ok
 }
 
+// It cleans the token on session cookie
 func (j AuthTokenStore) Clear(r *http.Request, w http.ResponseWriter) error {
 	s, _ := j.Store.Get(r, "sid")
     

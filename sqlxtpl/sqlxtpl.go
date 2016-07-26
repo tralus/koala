@@ -1,36 +1,50 @@
 package sqlxtpl
 
 import (
-	"reflect"
 	"database/sql"
 	
 	"github.com/jmoiron/sqlx"
 )
 
+// Generic error type for database aspects
 type DataBaseError struct {
 	Msg string
+	Stack string
 }
 
-func (err DataBaseError) Error() string {
-	return err.Msg 
+// RuntimeError interface
+func (e DataBaseError) GetStack() string {
+	return e.Stack
 }
 
-func NewDatabaseError(msg string) error {
-	return DataBaseError{msg}
+// RuntimeError interface
+func (e DataBaseError) Error() string {
+	return e.Msg
 }
 
-func IsDataBaseError(err error) bool {
-	return reflect.TypeOf(err) == reflect.TypeOf(DataBaseError{})
+// It creates a new DataBaseError instance
+func NewDataBaseError(m string) error {
+	s, _ := StackTrace()
+	return DataBaseError{m, s} 
 }
 
+// It verifies if error is an DataBaseError type
+func IsDataBaseError(e error) bool {
+	_, ok := e.(DataBaseError)
+	return ok
+}
+
+// SqlxTpl is a template for database queries
 type SqlxTpl struct {
 	DB *sqlx.DB
 }
 
+// It creates a SqlxTpl instance
 func NewSqlxTpl(db *sqlx.DB) *SqlxTpl {
 	return &SqlxTpl{db}
 }
 
+// It executes a callback function with a shared transaction
 func (sqlxTpl *SqlxTpl) TxDo(do func(tx *sqlx.Tx) error) error {
 	tx, err := Begin(sqlxTpl.DB)
 	
@@ -62,6 +76,7 @@ func (sqlxTpl *SqlxTpl) TxDo(do func(tx *sqlx.Tx) error) error {
 	return nil
 }
 
+// It creates a sqlx transaction
 func Begin(db *sqlx.DB) (*sqlx.Tx, error) {
 	tx, err := db.Beginx()
 	
@@ -73,6 +88,7 @@ func Begin(db *sqlx.DB) (*sqlx.Tx, error) {
 	return tx, nil
 }
 
+// It undoes queries of the transaction
 func Roolback(tx *sqlx.Tx) error {
 	if (tx == nil) {
 		return nil
@@ -88,6 +104,7 @@ func Roolback(tx *sqlx.Tx) error {
 	return nil
 }
 
+// It applies queries of the transaction
 func Commit(tx *sqlx.Tx) error {
 	if (tx == nil) {
 		return nil
@@ -103,6 +120,7 @@ func Commit(tx *sqlx.Tx) error {
 	return nil
 }
 
+// It executes the query without a transaction
 func (sqlxTpl *SqlxTpl) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	sqlResult, err := sqlxTpl.DB.NamedExec(query, arg)
 	
@@ -114,6 +132,7 @@ func (sqlxTpl *SqlxTpl) NamedExec(query string, arg interface{}) (sql.Result, er
    	return sqlResult, nil
 }
 
+// It executes the query with a transaction
 func (sqlxTpl *SqlxTpl) TxNamedExec(tx *sqlx.Tx, query string, arg interface{}) (sql.Result, error) {
 	if (tx == nil) {
 		return nil, NewDatabaseError(
