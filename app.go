@@ -8,7 +8,7 @@ type AppModule interface {
 	Up()
 }
 
-// It loads modules that implements AppModule interface
+// It loads modules that implement AppModule interface
 func UpAppModules(modules ...AppModule) {
 	for _, module:= range modules {
 		module.Up()
