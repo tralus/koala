@@ -1,6 +1,8 @@
 package knife
 
 import (
+	"io"
+	"io/ioutil"
 	"fmt"
 	"strconv"
 	"net/http"
@@ -299,7 +301,7 @@ func PanicRecoverMiddleware(next http.Handler) http.Handler {
 
 func JsonContentTypeMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if ((r.Method == "POST" || r.Method == "PUT") && 
+		if ((r.Method == "POST" || r.Method == "PUT") &&
 			r.Header.Get("Content-Type") != "application/json") {
 			
 			status := http.StatusUnsupportedMediaType
@@ -313,16 +315,25 @@ func JsonContentTypeMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func JsonUnMarshal(data []byte, v interface{}) error {
+func UnMarshalJsonFromBody(r io.Reader, v interface{}) error {
+	body, err := ioutil.ReadAll(r)
+	if (err != nil) {
+		format := fmt.Sprintf("It was not possible to read body json. Origin - %s", err.Error())
+		return NewUnMarshalError(format)
+	}
+	return UnMarshalJson(body, v)
+}
+
+func UnMarshalJson(data []byte, v interface{}) error {
 	err := json.Unmarshal(data, v)
 	if (err != nil) {
 		format := fmt.Sprintf("It was not possible to decode json. Origin - %s", err.Error())
-		return NewJsonUnMarshalError(format)
+		return NewUnMarshalError(format)
 	}
 	return nil
 }
 
-func JsonMarshal(v interface{}) ([]byte, error) {
+func MarshalJson(v interface{}) ([]byte, error) {
 	return json.Marshal(v)
 }
 
@@ -352,21 +363,21 @@ func (m *Module) Url(url string) string {
 	return rootPath + url
 }
 
-type JsonUnMarshalError struct {
+type UnMarshalError struct {
 	Msg string
 }
 
-func IsJsonUnMarshalError(err error) bool {
-	_, ok := err.(JsonUnMarshalError)
+func IsUnMarshalError(err error) bool {
+	_, ok := err.(UnMarshalError)
 	return ok
 }
 
-func (v JsonUnMarshalError) Error() string {
+func (v UnMarshalError) Error() string {
 	return v.Msg
 }
 
-func NewJsonUnMarshalError(msg string) JsonUnMarshalError {
-	return JsonUnMarshalError{msg}
+func NewUnMarshalError(msg string) UnMarshalError {
+	return UnMarshalError{msg}
 }
 
 func GetSimpleNetClient(secs int) *http.Client {

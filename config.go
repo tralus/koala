@@ -4,6 +4,8 @@ import (
   	"io/ioutil"
   	"path"
 
+	machineryConfig "github.com/RichardKnop/machinery/v1/config"
+	
   	"github.com/kardianos/osext"
   	"github.com/olebedev/config"
 )
@@ -62,36 +64,36 @@ type JwtConfig struct {
 	Secret string
 }
 
-// ApiClientConfig represents external/internal API information
+// ApiConfig represents external/internal API information
 // It is used for adapters of models on another external/internal domain
-type ApiClientConfig struct {
+type ApiConfig struct {
 	Host string
 	Timeout int
 }
 
 // It gets a instance for ApiClientConfig 
-func GetApiClientConfig(c *config.Config) ApiClientConfig {
-	apiClientConfig := ApiClientConfig{"", 35}
+func GetApiConfig(c *config.Config) ApiConfig {
+	apiConfig := ApiConfig{"", 35}
 	
 	config, err := c.Get("apiClient")
 	
 	if (err != nil) {
-		return apiClientConfig
+		return apiConfig
 	}
 	
 	host, err := config.String("host")
 	
 	if (err == nil) {
-		apiClientConfig.Host = host
+		apiConfig.Host = host
 	}
 	
 	timeout, err := config.Int("timeout")
 	
 	if (err == nil) {
-		apiClientConfig.Timeout = timeout
+		apiConfig.Timeout = timeout
 	}
 		
-	return apiClientConfig
+	return apiConfig
 }
 
 // GlobalConfig represents built-in general configs
@@ -201,4 +203,51 @@ func GetDBConfig(c *config.Config) (DBConfig, error) {
 	dbConfig = DBConfig{driver, datasource, maxOpenConns}  
 	
 	return dbConfig, nil
+}
+
+func GetMachineryConfig(targetEnv string) (*machineryConfig.Config, error) {
+	var filename = "machinery.yaml"
+	var data []byte
+	
+	var cnf = machineryConfig.Config{
+	  	Broker: "amqp://guest:guest@localhost:5672/",
+	  	ResultBackend: "amqp://guest:guest@localhost:5672/",
+	  	Exchange: "koala_exchange",
+	  	ExchangeType: "direct",
+	  	DefaultQueue: "koala_tasks",
+	  	BindingKey: "koala_task",
+	}
+	
+	if (targetEnv == "development") {
+		// file path relative to project folder
+		bytes, err := machineryConfig.ReadFromFile(filename)
+		
+		data = bytes
+		
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		binFolder, err := osext.ExecutableFolder()
+	  
+		if err != nil {
+			return nil, err
+		}
+		
+		filename = path.Join(binFolder, filename)
+		
+		data, err = machineryConfig.ReadFromFile(filename)
+		
+		if err != nil {
+			return nil, err
+		}
+	}
+	
+	err := machineryConfig.ParseYAMLConfig(&data, &cnf)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return &cnf, nil
 }

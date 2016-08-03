@@ -192,3 +192,11 @@ func stackTrace(skip int) (current, context string) {
 func StackTrace() (current, context string) {
 	return stackTrace(3)
 }
+
+// Catch error and get the stack trace
+func CatchStackTrace(err error) string {
+	if (IsRuntimeError(err)) {
+		return err.(RuntimeError).GetStack()
+	}
+	return err.Error()
+}
