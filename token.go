@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 	"time"
-	
+
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 	"github.com/tralus/koala/auth"
-	jwt "github.com/dgrijalva/jwt-go"
 )
 
 // Token represents a Token
@@ -15,78 +15,96 @@ type Token struct {
 	Value string `json:"token"`
 }
 
-// It creates a Token instance 
+// NewToken creates an instance of Token
 func NewToken(value string) Token {
 	return Token{value}
 }
 
-// TokenService is a interface with a method to generate a token
+// TokenService defines an interface for a token service
 type TokenService interface {
 	GenerateToken(details auth.UserDetails) (Token, error)
 }
 
-// JwtTokenService is a type that wrap auth service instance
-// It calls the authenticate method of AuthService and after generates a jwt token
+// JwtConfig represents the jwt settings
+type JwtConfig struct {
+	Exp    int
+	Secret string
+}
+
+// NewJwtConfig creates an instance for JwtConfig
+func NewJwtConfig(e int, s string) JwtConfig {
+	if e == 0 {
+		e = 72 // (7 (days) * 24 (hours)) - a week
+	}
+
+	return JwtConfig{e, s}
+}
+
+// JwtTokenService represents a jwt token service
+// It uses an AuthService for the authentication logic
+// It generates a jwt token from UserDetails data
 type JwtTokenService struct {
-	AuthService auth.AuthService 
+	AuthService   auth.DefaultService
 	SigningMethod jwt.SigningMethod
-	JwtConfig JwtConfig
+	JwtConfig     JwtConfig
 }
 
-// It creates a JwtTokenService instance
-func NewJwtTokenService(a auth.AuthService, m jwt.SigningMethod, j JwtConfig) JwtTokenService {
-	return JwtTokenService{a, m, j}
+// NewJwtTokenService creates a new instancer of JwtTokenService
+func NewJwtTokenService(a auth.DefaultService, m jwt.SigningMethod, c JwtConfig) JwtTokenService {
+	return JwtTokenService{a, m, c}
 }
 
-// It gets jwtClaimns param from request context 
+// GetJwtClaimns gets the claimn param from request context
 func GetJwtClaimns(r *http.Request, key string) (interface{}, error) {
 	if c := context.Get(r, "jwtClaimns"); c != nil {
 		claimns := c.(map[string]interface{})
-		
+
 		if v, ok := claimns[key]; ok {
-			return v, nil			
+			return v, nil
 		}
 	}
 
 	return nil, errors.New("JWT Claimns with key " + key + " not found.")
 }
 
-// It authenticates on AuthService and after generates a jwt token
+// Authenticate authenticates via AuthService and generates a jwt token
 func (s JwtTokenService) Authenticate(username string, pwd string) (Token, error) {
 	var token Token
-	
-	user, err := s.AuthService.Authenticate(username, pwd)
-	
-	if (err != nil) {
-		return token, err
-	}
-		
-	token, err = s.GenerateToken(user)
-		
-	if (err != nil) {
-		return token, err
-	}
-	
-	return token, nil
-}
 
-// It generates a token with UserDetails data
-func (s JwtTokenService) GenerateToken(details auth.UserDetails) (Token, error) {
-	var token Token
-	
-	jwtToken := jwt.New(s.SigningMethod)
-	
-	duration := time.Hour * time.Duration(s.JwtConfig.Expire)
-	
-	jwtToken.Claims["exp"] = time.Now().Add(duration).Unix()
-	jwtToken.Claims["iat"] = time.Now().Unix()
-	jwtToken.Claims["jit"] = details.Username
-	
-	tokenString, err := jwtToken.SignedString([]byte(s.JwtConfig.Secret))
-	
+	user, err := s.AuthService.Authenticate(username, pwd)
+
 	if err != nil {
 		return token, err
 	}
-	
+
+	token, err = s.GenerateToken(user)
+
+	if err != nil {
+		return token, err
+	}
+
+	return token, nil
+}
+
+// GenerateToken generates a token with UserDetails data
+func (s JwtTokenService) GenerateToken(details auth.UserDetails) (Token, error) {
+	var token Token
+
+	duration := time.Hour * time.Duration(s.JwtConfig.Exp)
+
+	claims := &jwt.StandardClaims{
+		ExpiresAt: time.Now().Add(duration).Unix(),
+		IssuedAt:  time.Now().Unix(),
+		Id:        details.Username,
+	}
+
+	jwtToken := jwt.NewWithClaims(s.SigningMethod, claims)
+
+	tokenString, err := jwtToken.SignedString([]byte(s.JwtConfig.Secret))
+
+	if err != nil {
+		return token, err
+	}
+
 	return NewToken(tokenString), nil
 }

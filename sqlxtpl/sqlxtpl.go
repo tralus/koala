@@ -2,182 +2,230 @@ package sqlxtpl
 
 import (
 	"database/sql"
-	
+
 	"github.com/jmoiron/sqlx"
 	"github.com/tralus/koala/errors"
+
+	"gopkg.in/guregu/null.v3"
 )
 
-// Generic error type for database aspects
+// DatabaseError error type for database error
 type DatabaseError struct {
-	Msg string
+	Msg   string
 	Stack string
 }
 
-// RuntimeError interface
+// GetStack gets stack trace error
 func (e DatabaseError) GetStack() string {
 	return e.Stack
 }
 
-// RuntimeError interface
+// Built-in interface
 func (e DatabaseError) Error() string {
 	return e.Msg
 }
 
-// It creates a new DataBaseError instance
+// NewDatabaseError creates a new DataBaseError instance
 func NewDatabaseError(m string) error {
 	s, _ := errors.StackTrace()
-	return DatabaseError{m, s} 
+	return DatabaseError{m, s}
 }
 
-// It verifies if error is an DataBaseError type
+// IsDatabaseError verifies if error is an DataBaseError
 func IsDatabaseError(e error) bool {
 	_, ok := e.(DatabaseError)
 	return ok
 }
 
-// Interface for a struct that supports transaction
-type TxSqlSetter interface {
+// EmptyResultDataError error type for an empty result database
+type EmptyResultDataError struct {
+	Msg   string
+	Stack string
+}
+
+// GetStack gets stack trace error
+func (e EmptyResultDataError) GetStack() string {
+	return e.Stack
+}
+
+// Built-in interface
+func (e EmptyResultDataError) Error() string {
+	return e.Msg
+}
+
+// NewEmptyResultDataError creates an EmptyResultDataError instance
+func NewEmptyResultDataError(m string) error {
+	s, _ := errors.StackTrace()
+	return EmptyResultDataError{m, s}
+}
+
+// IsEmptyResultDataError verifies if error is an EmptyResultDataError
+func IsEmptyResultDataError(e error) bool {
+	_, ok := e.(EmptyResultDataError)
+	return ok
+}
+
+// TxSQLSetter interface for a struct that supports transaction
+type TxSQLSetter interface {
 	SetTx(tx *sqlx.Tx)
 }
 
-// TransactedSql should be embedded on sql repositories
-type TransactedSql struct {
+// TransactedSQL should be embedded on sql repositories
+type TransactedSQL struct {
 	tx *sqlx.Tx
 }
 
-// Set the sql transaction
-func (t *TransactedSql) SetTx(tx *sqlx.Tx) {
+// SetTx sets the sql transaction
+func (t *TransactedSQL) SetTx(tx *sqlx.Tx) {
 	t.tx = tx
 }
 
-// Get the sql transaction
-func (t *TransactedSql) Tx() *sqlx.Tx {
+// Tx gets the sql transaction
+func (t *TransactedSQL) Tx() *sqlx.Tx {
 	return t.tx
 }
 
 // SqlxTpl is a template for database queries
 type SqlxTpl struct {
-	TransactedSql
-	
+	TransactedSQL
 	DB *sqlx.DB
 }
 
-// It creates a SqlxTpl instance
-func NewSqlxTpl(db *sqlx.DB) *SqlxTpl {
-	return &SqlxTpl{TransactedSql{}, db}
+// UnsafeSelect executes unsafe select on the database connection
+func (s SqlxTpl) UnsafeSelect(dest interface{}, query string, args ...interface{}) error {
+	err := s.DB.Select(dest, query, args)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return NewEmptyResultDataError("Empty result data.")
+		}
+		return NewDatabaseError("Database Error - UnsafeSelect Tx: " + err.Error())
+	}
+
+	return nil
 }
 
-// It executes a callback function with a shared transaction
-func (sqlxTpl *SqlxTpl) TxDo(do func(tx *sqlx.Tx) error) error {
-	tx, err := Begin(sqlxTpl.DB)
-	
-	if (err != nil) {
+// NewSqlxTpl creates a SqlxTpl instance
+func NewSqlxTpl(db *sqlx.DB) *SqlxTpl {
+	return &SqlxTpl{TransactedSQL{}, db}
+}
+
+// TxDo executes a callback function with a shared transaction
+func (s *SqlxTpl) TxDo(do func(tx *sqlx.Tx) error) error {
+	tx, err := Begin(s.DB)
+
+	if err != nil {
 		return NewDatabaseError(
 			"Database Error - Begin Tx: " + err.Error())
 	}
-	
+
 	err = do(tx)
-	
-	if (err != nil) {
+
+	if err != nil {
 		errback := Rollback(tx)
-		
-		if (errback != nil) {
+
+		if errback != nil {
 			return NewDatabaseError(
 				"Database Error - Roolback: " + errback.Error())
 		}
-		
+
 		return NewDatabaseError(
-			"Database Error - TxDo Callback: " + err.Error()) 
+			"Database Error - TxDo Callback: " + err.Error())
 	}
-	
+
 	err = Commit(tx)
-	
-	if (err != nil) {
+
+	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
-// It creates a sqlx transaction
+// Begin creates a sqlx transaction
 func Begin(db *sqlx.DB) (*sqlx.Tx, error) {
 	tx, err := db.Beginx()
-	
-	if (err != nil) {
+
+	if err != nil {
 		return nil, NewDatabaseError(
 			"Database Error - Begin Tx: " + err.Error())
 	}
-	
+
 	return tx, nil
 }
 
-// It undoes queries of the transaction
+// Rollback undoes queries of the transaction
 func Rollback(tx *sqlx.Tx) error {
-	if (tx == nil) {
+	if tx == nil {
 		return nil
 	}
-	
+
 	err := tx.Rollback()
-    	
-	if (err != nil) {
+
+	if err != nil {
 		return NewDatabaseError(
 			"Database Error - Can`t Rollback: " + err.Error())
 	}
-	
+
 	return nil
 }
 
-// It applies queries of the transaction
+// Commit applies queries of the transaction
 func Commit(tx *sqlx.Tx) error {
-	if (tx == nil) {
+	if tx == nil {
 		return nil
 	}
-	
+
 	err := tx.Commit()
-	
-	if (err != nil) {
+
+	if err != nil {
 		return NewDatabaseError(
 			"Database Error - Can`t Commit: " + err.Error())
 	}
-	
+
 	return nil
 }
 
-// It executes the query without a transaction
+// NamedExec executes a query
 // If a transaction is setted, the query runs over it
-func (sqlxTpl *SqlxTpl) NamedExec(query string, arg interface{}) (sql.Result, error) {
+func (s *SqlxTpl) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	var sqlResult sql.Result
 	var err error
-	
-	tx := sqlxTpl.Tx()
-	
-	if tx != nil {
-		sqlResult, err = tx.NamedExec(query, arg)
+
+	t := s.Tx()
+
+	if t != nil {
+		sqlResult, err = t.NamedExec(query, arg)
 	} else {
-		sqlResult, err = sqlxTpl.DB.NamedExec(query, arg)
+		sqlResult, err = s.DB.NamedExec(query, arg)
 	}
-	
-   	if (err != nil) {
+
+	if err != nil {
 		return nil, NewDatabaseError(
-    		"Database Error - NamedExec: " + err.Error())
+			"Database Error - NamedExec: " + err.Error())
 	}
-   	
-   	return sqlResult, nil
+
+	return sqlResult, nil
 }
 
-// It executes the query with a transaction
-func (sqlxTpl *SqlxTpl) TxNamedExec(tx *sqlx.Tx, query string, arg interface{}) (sql.Result, error) {
-	if (tx == nil) {
+// TxNamedExec executes the query with a transaction
+func (s *SqlxTpl) TxNamedExec(tx *sqlx.Tx, query string, arg interface{}) (sql.Result, error) {
+	if tx == nil {
 		return nil, NewDatabaseError(
-    		"Database Error - Tx is not a valid instance.")
+			"Database Error - Tx is not a valid instance.")
 	}
-	
+
 	sqlResult, err := tx.NamedExec(query, arg)
-	
-	if (err != nil) {
+
+	if err != nil {
 		return nil, NewDatabaseError(
-    		"Database Error - NamedExec: " + err.Error())
+			"Database Error - NamedExec: " + err.Error())
 	}
-	
+
 	return sqlResult, nil
+}
+
+// NullInt returns a invalid null.Int when i is zero
+func NullInt(i int) null.Int {
+	return null.NewInt(int64(i), i != 0)
 }

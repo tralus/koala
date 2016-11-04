@@ -1,84 +1,113 @@
 package auth
 
 import (
-	"net/http"
 	"crypto/sha256"
 	"encoding/hex"
-	
+	"net/http"
+
 	"github.com/gorilla/context"
 	"github.com/tralus/koala/errors"
 )
 
-// Generic error type for user not found logic
-type UsernameNotFoundError struct {
-	Msg string
+// UsernameExistsError represents error for username exists logic
+type UsernameExistsError struct {
+	Msg   string
 	Stack string
 }
 
-// RuntimeError interface
-func (e UsernameNotFoundError) GetStack() string {
+// GetStack gets the error stack trace
+func (e UsernameExistsError) GetStack() string {
 	return e.Stack
 }
 
 // RuntimeError interface
+func (e UsernameExistsError) Error() string {
+	return e.Msg
+}
+
+// NewUsernameExistsError creates an UsernameExistsError instance
+func NewUsernameExistsError(m string) error {
+	_, s := errors.StackTrace()
+	return UsernameExistsError{m, s}
+}
+
+// IsUsernameExistsError verifies if error is an UsernameExistsError
+func IsUsernameExistsError(e error) bool {
+	_, ok := e.(UsernameExistsError)
+	return ok
+}
+
+// UsernameNotFoundError represents error for user not found logic
+type UsernameNotFoundError struct {
+	Msg   string
+	Stack string
+}
+
+// GetStack gets the error stack trace
+func (e UsernameNotFoundError) GetStack() string {
+	return e.Stack
+}
+
+// Built-in interface
 func (e UsernameNotFoundError) Error() string {
 	return e.Msg
 }
 
-// It creates an UsernameNotFoundError instance
+// NewUsernameNotFoundError creates an UsernameNotFoundError instance
 func NewUsernameNotFoundError(m string) error {
 	_, s := errors.StackTrace()
-	return UsernameNotFoundError{m, s} 
+	return UsernameNotFoundError{m, s}
 }
 
-// It verifies if error is a UsernameNotFoundError type
+// IsUsernameNotFoundError verifies if error is an UsernameNotFoundError
 func IsUsernameNotFoundError(e error) bool {
 	_, ok := e.(UsernameNotFoundError)
 	return ok
 }
 
-// Generic error type for not authorized logic
+// NotAuthorizedError represents the error for not authorized logic
 type NotAuthorizedError struct {
-	Msg string
+	Msg   string
 	Stack string
 }
 
-// RuntimeError interface
+// GetStack gets the error stack trace
 func (e NotAuthorizedError) GetStack() string {
 	return e.Stack
 }
 
-// RuntimeError interface
+// Built-in interface
 func (e NotAuthorizedError) Error() string {
 	return e.Msg
 }
 
+// NewNotAuthorizedError creates a NotAuthorizedError instance
 func NewNotAuthorizedError(m string) error {
-	_, s := errors.StackTrace()
-	return NotAuthorizedError{m, s} 
+	s, _ := errors.StackTrace()
+	return NotAuthorizedError{m, s}
 }
 
-// It creates a NotAuthorizedError instance
+// IsNotAuthorizedError verifies if error is an NotAuthorizedError
 func IsNotAuthorizedError(e error) bool {
 	_, ok := e.(NotAuthorizedError)
 	return ok
 }
 
-// UserDetails represents basic data of the user
+// UserDetails represents the user data
 // The username should be a unique value as an email field
 type UserDetails struct {
-  	Username string
-  	Password string
-  	IsActive bool
+	Username string
+	Password string
+	IsActive bool
 }
 
-// It gets a UserDetails instance from request context
+// ContextUser gets an UserDetails instance from request context
 func ContextUser(r *http.Request) (UserDetails, error) {
 	var details UserDetails
-	
+
 	if u := context.Get(r, "user"); u != nil {
 		details, ok := u.(UserDetails)
-		if (!ok) {
+		if !ok {
 			message := "The user on context is not an UserDetails instance."
 			return details, errors.New(message)
 		}
@@ -88,62 +117,62 @@ func ContextUser(r *http.Request) (UserDetails, error) {
 	return details, errors.New("Key user not found on context.")
 }
 
-// UserDetailsService is an interface implemented to create an UserDetails
+// UserDetailsService defines an interface to implement UserDetails logic
 type UserDetailsService interface {
-  	LoadUserByUsername(username string) (UserDetails, error)
+	LoadUserByUsername(username string) (UserDetails, error)
 }
 
-// PasswordStrategy is a interface to create password logic
+// PasswordStrategy defines an interface to create password logic
 type PasswordStrategy interface {
-  	Exec(password string) string
+	Exec(password string) string
 }
 
 // Sha256PasswordStrategy implements the logic for hash sha256
-type Sha256PasswordStrategy struct {}
+type Sha256PasswordStrategy struct{}
 
-// It hashs the password usgin sha256
+// Exec generates the password using sha256
 func (s Sha256PasswordStrategy) Exec(password string) string {
 	digest := sha256.New()
 	digest.Write([]byte(password))
 	return hex.EncodeToString(digest.Sum(nil))
 }
 
-// It creates Sha256PasswordStrategy instance
+// NewSha256Password creates Sha256PasswordStrategy instance
 func NewSha256Password() Sha256PasswordStrategy {
-  	return Sha256PasswordStrategy{}
+	return Sha256PasswordStrategy{}
 }
 
-// It a helper method to create a Sha256PasswordStrategy and to return a hashed password 
+// Sha256Password is a helper method to create a Sha256PasswordStrategy and to return a hashed password
 func Sha256Password(password string) string {
-  	return NewSha256Password().Exec(password)
+	return NewSha256Password().Exec(password)
 }
 
-// AuthService executes the logic that performs the comparison of passwords
-type AuthService struct {
-  	UserDetailsService UserDetailsService
-  	
+// DefaultService executes the logic that performs the comparison of passwords
+type DefaultService struct {
+	UserDetailsService UserDetailsService
+
 	// It is used to get the hash of password
-  	PasswordStrategy PasswordStrategy
+	PasswordStrategy PasswordStrategy
 }
 
-// It creates an AuthService instance
-func NewAuthService(u UserDetailsService, s PasswordStrategy) AuthService {
-  	return AuthService{u, s}
+// NewDefaultService creates an DefaultService instance
+func NewDefaultService(u UserDetailsService, s PasswordStrategy) DefaultService {
+	return DefaultService{u, s}
 }
 
-// It authenticates using UserDetailsService and after it compares the passwords
-func (auth AuthService) Authenticate(username string, password string) (UserDetails, error) {
-  	user, err := auth.UserDetailsService.LoadUserByUsername(username)
-  
-  	if (err != nil) {
-    	return user, err
-  	}
-  
-  	old := auth.PasswordStrategy.Exec(password)
-  
-  	if (user.Password != old) {
-  		return user, NewNotAuthorizedError("Not authorized for password")
-  	}
-    
-  	return user, nil
+// Authenticate uses UserDetailsService and after it compares the passwords
+func (auth DefaultService) Authenticate(username string, password string) (UserDetails, error) {
+	user, err := auth.UserDetailsService.LoadUserByUsername(username)
+
+	if err != nil {
+		return user, err
+	}
+
+	old := auth.PasswordStrategy.Exec(password)
+
+	if user.Password != old {
+		return user, NewNotAuthorizedError("Credentials not authorized.")
+	}
+
+	return user, nil
 }

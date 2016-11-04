@@ -4,28 +4,29 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type DB struct {
-	DBConfig DBConfig
+// DBConfig represents the database config
+type DBConfig struct {
+	Driver       string
+	Datasource   string
+	MaxOpenConns int
+	MaxIdleConns int
 }
 
-// It creates a new DB instance
-func NewDB(config DBConfig) *DB {
-	return &DB{config}
+// NewDBConfig creates an instance of DatabaseConfig
+func NewDBConfig(dr string, dt string) DBConfig {
+	return DBConfig{Driver: dr, Datasource: dt}
 }
 
-// It connects to database
-func (db *DB) Connect() (*sqlx.DB, error) {
-	config := db.DBConfig
-	
-	sqlxdb, err := sqlx.Connect(config.Driver, config.Datasource)
-	
-	db.Configure(sqlxdb)
-	
+// ConnectDB connects for the database
+func ConnectDB(c DBConfig) (*sqlx.DB, error) {
+	if c.MaxOpenConns == 0 {
+		c.MaxOpenConns = 20
+	}
+
+	sqlxdb, err := sqlx.Connect(c.Driver, c.Datasource)
+
+	sqlxdb.SetMaxOpenConns(c.MaxOpenConns)
+	sqlxdb.SetMaxIdleConns(c.MaxIdleConns)
+
 	return sqlxdb, err
-}
-
-// It sets default values for the connection
-func (db *DB) Configure(sqlxDB *sqlx.DB) {
-	sqlxDB.SetMaxOpenConns(db.DBConfig.MaxOpenConns)
-	sqlxDB.SetMaxIdleConns(0)
 }

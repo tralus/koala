@@ -1,135 +1,165 @@
-// NOTE: This package intentionally mirrors the standard "errors" module.
-// All packages on Koala should use this 
+// Package errors intentionally mirrors the standard "errors" module.
+// All packages on Koala should use this.
 package errors
 
 import (
 	"bytes"
 	"runtime"
-) 
+)
 
 // RuntimeError interface exposes additional information about the error.
 type RuntimeError interface {
-	// This returns the stack trace without the error message.
+	// Returns the stack trace without the error message.
 	GetStack() string
-	
-	// Implements the built-in error interface.
+
 	Error() string
 }
 
-// It verifies if error is a RuntimeError type 
+// IsRuntimeError verifies if the error is a RuntimeError
 func IsRuntimeError(e error) bool {
 	_, ok := e.(RuntimeError)
 	return ok
 }
 
-// Base error type
+// Error represents a generic error
 // It implements RuntimeError interface
 type Error struct {
-	Msg string
+	Msg   string
 	Stack string
 }
 
-// RuntimeError interface
+// GetStack gets the error stack trace
 func (e Error) GetStack() string {
 	return e.Stack
 }
 
-// RuntimeError interface
+// Error gets the error message
 func (e Error) Error() string {
 	return e.Msg
 }
 
-// It creates a new Error instance
+// New creates an error from Error
 func New(m string) error {
 	s, _ := StackTrace()
-	return Error{m, s} 
+	return Error{m, s}
 }
 
-// It verifies if error is an Error type
+// IsError verifies if the error is an Error
 func IsError(e error) bool {
 	_, ok := e.(Error)
 	return ok
 }
 
-// Generic error type for not found logic
+// NotFoundError represents a not found error
+// It implements the RuntimeError interface
 type NotFoundError struct {
-	Msg string
+	Msg   string
 	Stack string
 }
 
-// RuntimeError interface
+// GetStack gets the error stack trace
 func (e NotFoundError) GetStack() string {
 	return e.Stack
 }
 
-// RuntimeError interface
+// Error gets the error message
 func (e NotFoundError) Error() string {
 	return e.Msg
 }
 
-// It creates a new NotFoundError instance
+// NewNotFoundError creates an error from NotFoundError
 func NewNotFoundError(m string) error {
 	s, _ := StackTrace()
-	return NotFoundError{m, s} 
+	return NotFoundError{m, s}
 }
 
-// It verifies if error is a NotFoundError type
+// IsNotFoundError verifies if error is a NotFoundError
 func IsNotFoundError(e error) bool {
 	_, ok := e.(NotFoundError)
 	return ok
 }
 
-// Generic error type for illegal data 
+// IllegalStateError represents an illegal state error
+// It implements the RuntimeError interface
 type IllegalStateError struct {
-	Msg string
+	Msg   string
 	Stack string
 }
 
-// RuntimeError interface
+// GetStack gets the error stack trace
 func (e IllegalStateError) GetStack() string {
 	return e.Stack
 }
 
-// RuntimeError interface
+// Error gets the error message
 func (e IllegalStateError) Error() string {
 	return e.Msg
 }
 
-// It creates a new NotFoundError instance
+// NewIllegalStateError creates an IllegalStateError instance
 func NewIllegalStateError(m string) error {
 	s, _ := StackTrace()
-	return IllegalStateError{m, s} 
+	return IllegalStateError{m, s}
 }
 
-// It verifies if error is an IllegalStateError type
+// IsIllegalStateError verifies if error is an IllegalStateError
 func IsIllegalStateError(e error) bool {
 	_, ok := e.(IllegalStateError)
 	return ok
 }
 
-// Generic error type for relationship aspects
-type RelationshipError struct {
-	Msg string
+// IllegalArgumentError represents an illegal argument error
+// It implements the RuntimeError interface
+type IllegalArgumentError struct {
+	Msg   string
 	Stack string
 }
 
-// RuntimeError interface
+// GetStack gets the error stack trace
+func (e IllegalArgumentError) GetStack() string {
+	return e.Stack
+}
+
+// Error gets the error message
+func (e IllegalArgumentError) Error() string {
+	return e.Msg
+}
+
+// NewIllegalArgumentError creates an IllegalArgumentError instance
+func NewIllegalArgumentError(m string) error {
+	s, _ := StackTrace()
+	return IllegalArgumentError{m, s}
+}
+
+// IsIllegalStateError verifies if error is an IllegalStateError
+func IsIllegalArgumentError(e error) bool {
+	_, ok := e.(IllegalArgumentError)
+	return ok
+}
+
+// RelationshipError represents a relationship error
+type RelationshipError struct {
+	Msg   string
+	Stack string
+}
+
+// GetStack gets the error stack trace
 func (e RelationshipError) GetStack() string {
 	return e.Stack
 }
 
-// RuntimeError interface
+// Error gets the error messsage
 func (e RelationshipError) Error() string {
 	return e.Msg
 }
 
-// It creates a new RelationshipError instance
+// NewRelationshipError creates an error from RelationshipError
 func NewRelationshipError(m string) error {
 	s, _ := StackTrace()
-	return RelationshipError{m, s} 
+	return RelationshipError{m, s}
 }
 
-// It verifies if error is an RelationshipError type
+// IsRelationshipError verifies if error is an RelationshipError
 func IsRelationshipError(e error) bool {
 	_, ok := e.(RelationshipError)
 	return ok
@@ -188,14 +218,14 @@ func stackTrace(skip int) (current, context string) {
 	return strippedBuf.String(), string(buf[index:])
 }
 
-// This returns the current stack trace string.
+// StackTrace returns the current stack trace string.
 func StackTrace() (current, context string) {
 	return stackTrace(3)
 }
 
-// Catch error and get the stack trace
+// CatchStackTrace catchs the error and get the stack trace
 func CatchStackTrace(err error) string {
-	if (IsRuntimeError(err)) {
+	if IsRuntimeError(err) {
 		return err.(RuntimeError).GetStack()
 	}
 	return err.Error()
