@@ -1,0 +1,19 @@
+package: github.com/tralus/koala
+import:
+- package: github.com/asaskevich/govalidator
+  version: ~5.0.0
+- package: github.com/dgrijalva/jwt-go
+  version: ~3.0.0
+- package: github.com/gorilla/context
+  version: ~1.1.0
+- package: github.com/gorilla/sessions
+  version: ~1.1.0
+- package: github.com/jmoiron/sqlx
+- package: github.com/julienschmidt/httprouter
+  version: ~1.1.0
+- package: github.com/justinas/alice
+  version: ~1.0.0
+- package: github.com/namsral/flag
+- package: gopkg.in/guregu/null.v3
+  version: ~3.1.0
+- package: gopkg.in/yaml.v2
