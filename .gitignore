@@ -3,6 +3,9 @@
 .settings
 debug
 
+# Glide lock
+glide.lock
+
 # Go vendor folder 
 vendor
 

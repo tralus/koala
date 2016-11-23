@@ -34,9 +34,9 @@ type Config struct {
 		Exp    int
 	}
 
-	Database struct {
-		Driver     string
-		Datasource string
+	DB struct {
+		Driver string
+		DSN    string
 	}
 }
 
