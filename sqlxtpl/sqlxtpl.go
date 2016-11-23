@@ -6,6 +6,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/tralus/koala/db"
 	"github.com/tralus/koala/errors"
+
+	"gopkg.in/guregu/null.v3"
 )
 
 // EmptyResultDataError error type for an empty result database
