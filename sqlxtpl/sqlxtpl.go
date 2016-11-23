@@ -4,38 +4,9 @@ import (
 	"database/sql"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/tralus/koala/db"
 	"github.com/tralus/koala/errors"
-
-	"gopkg.in/guregu/null.v3"
 )
-
-// DatabaseError error type for database error
-type DatabaseError struct {
-	Msg   string
-	Stack string
-}
-
-// GetStack gets stack trace error
-func (e DatabaseError) GetStack() string {
-	return e.Stack
-}
-
-// Built-in interface
-func (e DatabaseError) Error() string {
-	return e.Msg
-}
-
-// NewDatabaseError creates a new DataBaseError instance
-func NewDatabaseError(m string) error {
-	s, _ := errors.StackTrace()
-	return DatabaseError{m, s}
-}
-
-// IsDatabaseError verifies if error is an DataBaseError
-func IsDatabaseError(e error) bool {
-	_, ok := e.(DatabaseError)
-	return ok
-}
 
 // EmptyResultDataError error type for an empty result database
 type EmptyResultDataError struct {
@@ -99,7 +70,7 @@ func (s SqlxTpl) UnsafeSelect(dest interface{}, query string, args ...interface{
 		if err == sql.ErrNoRows {
 			return NewEmptyResultDataError("Empty result data.")
 		}
-		return NewDatabaseError("Database Error - UnsafeSelect Tx: " + err.Error())
+		return db.NewDatabaseError("Database Error - UnsafeSelect Tx: " + err.Error())
 	}
 
 	return nil
@@ -115,7 +86,7 @@ func (s *SqlxTpl) TxDo(do func(tx *sqlx.Tx) error) error {
 	tx, err := Begin(s.DB)
 
 	if err != nil {
-		return NewDatabaseError(
+		return db.NewDatabaseError(
 			"Database Error - Begin Tx: " + err.Error())
 	}
 
@@ -125,11 +96,11 @@ func (s *SqlxTpl) TxDo(do func(tx *sqlx.Tx) error) error {
 		errback := Rollback(tx)
 
 		if errback != nil {
-			return NewDatabaseError(
+			return db.NewDatabaseError(
 				"Database Error - Roolback: " + errback.Error())
 		}
 
-		return NewDatabaseError(
+		return db.NewDatabaseError(
 			"Database Error - TxDo Callback: " + err.Error())
 	}
 
@@ -143,11 +114,11 @@ func (s *SqlxTpl) TxDo(do func(tx *sqlx.Tx) error) error {
 }
 
 // Begin creates a sqlx transaction
-func Begin(db *sqlx.DB) (*sqlx.Tx, error) {
-	tx, err := db.Beginx()
+func Begin(d *sqlx.DB) (*sqlx.Tx, error) {
+	tx, err := d.Beginx()
 
 	if err != nil {
-		return nil, NewDatabaseError(
+		return nil, db.NewDatabaseError(
 			"Database Error - Begin Tx: " + err.Error())
 	}
 
@@ -163,7 +134,7 @@ func Rollback(tx *sqlx.Tx) error {
 	err := tx.Rollback()
 
 	if err != nil {
-		return NewDatabaseError(
+		return db.NewDatabaseError(
 			"Database Error - Can`t Rollback: " + err.Error())
 	}
 
@@ -179,7 +150,7 @@ func Commit(tx *sqlx.Tx) error {
 	err := tx.Commit()
 
 	if err != nil {
-		return NewDatabaseError(
+		return db.NewDatabaseError(
 			"Database Error - Can`t Commit: " + err.Error())
 	}
 
@@ -201,7 +172,7 @@ func (s *SqlxTpl) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	}
 
 	if err != nil {
-		return nil, NewDatabaseError(
+		return nil, db.NewDatabaseError(
 			"Database Error - NamedExec: " + err.Error())
 	}
 
@@ -211,14 +182,14 @@ func (s *SqlxTpl) NamedExec(query string, arg interface{}) (sql.Result, error) {
 // TxNamedExec executes the query with a transaction
 func (s *SqlxTpl) TxNamedExec(tx *sqlx.Tx, query string, arg interface{}) (sql.Result, error) {
 	if tx == nil {
-		return nil, NewDatabaseError(
+		return nil, db.NewDatabaseError(
 			"Database Error - Tx is not a valid instance.")
 	}
 
 	sqlResult, err := tx.NamedExec(query, arg)
 
 	if err != nil {
-		return nil, NewDatabaseError(
+		return nil, db.NewDatabaseError(
 			"Database Error - NamedExec: " + err.Error())
 	}
 
