@@ -1,4 +1,4 @@
-package db
+package sqlxdb
 
 import (
 	"github.com/jmoiron/sqlx"
@@ -14,7 +14,7 @@ type Config struct {
 	MaxIdleConns int
 }
 
-// NewConfig creates an instance of DatabaseConfig
+// NewConfig creates an instance of Config
 func NewConfig(dr string, dt string) Config {
 	return Config{Driver: dr, DSN: dt}
 }
@@ -25,12 +25,12 @@ func Connect(c Config) (*sqlx.DB, error) {
 		c.MaxOpenConns = 20
 	}
 
-	sqlxdb, err := sqlx.Connect(c.Driver, c.DSN)
+	db, err := sqlx.Connect(c.Driver, c.DSN)
 
-	sqlxdb.SetMaxOpenConns(c.MaxOpenConns)
-	sqlxdb.SetMaxIdleConns(c.MaxIdleConns)
+	db.SetMaxOpenConns(c.MaxOpenConns)
+	db.SetMaxIdleConns(c.MaxIdleConns)
 
-	return sqlxdb, err
+	return db, err
 }
 
 // DatabaseError error type for database error
