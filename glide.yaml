@@ -17,3 +17,4 @@ import:
 - package: gopkg.in/guregu/null.v3
   version: ~3.1.0
 - package: gopkg.in/yaml.v2
+- package: github.com/rubenv/sql-migrate
