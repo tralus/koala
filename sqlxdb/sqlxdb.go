@@ -27,6 +27,10 @@ func Connect(c Config) (*sqlx.DB, error) {
 
 	db, err := sqlx.Connect(c.Driver, c.DSN)
 
+	if err != nil {
+		return nil, err
+	}
+
 	db.SetMaxOpenConns(c.MaxOpenConns)
 	db.SetMaxIdleConns(c.MaxIdleConns)
 
