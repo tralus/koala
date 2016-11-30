@@ -1,4 +1,4 @@
-package koala
+package token
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+
 	"github.com/gorilla/context"
 	"github.com/tralus/koala/auth"
 )
@@ -15,13 +16,13 @@ type Token struct {
 	Value string `json:"token"`
 }
 
-// NewToken creates an instance of Token
-func NewToken(value string) Token {
+// New creates an instance of Token
+func New(value string) Token {
 	return Token{value}
 }
 
-// TokenService defines an interface for a token service
-type TokenService interface {
+// Service defines an interface for a token service
+type Service interface {
 	GenerateToken(details auth.UserDetails) (Token, error)
 }
 
@@ -106,5 +107,5 @@ func (s JwtTokenService) GenerateToken(details auth.UserDetails) (Token, error) 
 		return token, err
 	}
 
-	return NewToken(tokenString), nil
+	return New(tokenString), nil
 }
