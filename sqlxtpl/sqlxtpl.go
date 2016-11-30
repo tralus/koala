@@ -61,12 +61,69 @@ func (t *TransactedSQL) Tx() *sqlx.Tx {
 // SqlxTpl is a template for database queries
 type SqlxTpl struct {
 	TransactedSQL
+
 	DB *sqlx.DB
+}
+
+// UnsafeQueryx executes unsafe query on the database connection
+func (s SqlxTpl) UnsafeQueryx(query string) (*sqlx.Rows, error) {
+	rows, err := s.DB.Unsafe().Queryx(query)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return rows, NewEmptyResultDataError("Empty result data.")
+		}
+		return rows, sqlxdb.NewDatabaseError(err.Error())
+	}
+
+	return rows, nil
 }
 
 // UnsafeSelect executes unsafe select on the database connection
 func (s SqlxTpl) UnsafeSelect(dest interface{}, query string, args ...interface{}) error {
-	err := s.DB.Select(dest, query, args)
+	err := s.DB.Unsafe().Select(dest, query, args...)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return NewEmptyResultDataError("Empty result data.")
+		}
+		return sqlxdb.NewDatabaseError(err.Error())
+	}
+
+	return nil
+}
+
+// Select executes safe select on the database connection
+func (s SqlxTpl) Select(dest interface{}, query string, args ...interface{}) error {
+	err := s.DB.Select(dest, query, args...)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return NewEmptyResultDataError("Empty result data.")
+		}
+		return sqlxdb.NewDatabaseError(err.Error())
+	}
+
+	return nil
+}
+
+// UnsafeGet executes unsafe get on the database connection
+func (s SqlxTpl) UnsafeGet(dest interface{}, query string, args ...interface{}) error {
+	err := s.DB.Unsafe().Get(dest, query, args...)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return NewEmptyResultDataError("Empty result data.")
+		}
+		return sqlxdb.NewDatabaseError(err.Error())
+	}
+
+	return nil
+}
+
+// Get executes safe get on the database connection
+func (s SqlxTpl) Get(dest interface{}, query string, args ...interface{}) error {
+	err := s.DB.Get(dest, query, args...)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -79,8 +136,8 @@ func (s SqlxTpl) UnsafeSelect(dest interface{}, query string, args ...interface{
 }
 
 // NewSqlxTpl creates a SqlxTpl instance
-func NewSqlxTpl(db *sqlx.DB) *SqlxTpl {
-	return &SqlxTpl{TransactedSQL{}, db}
+func NewSqlxTpl(db *sqlx.DB) SqlxTpl {
+	return SqlxTpl{TransactedSQL{}, db}
 }
 
 // TxDo executes a callback function with a shared transaction
@@ -155,7 +212,7 @@ func Commit(tx *sqlx.Tx) error {
 
 // NamedExec executes a query
 // If a transaction is setted, the query runs over it
-func (s *SqlxTpl) NamedExec(query string, arg interface{}) (sql.Result, error) {
+func (s SqlxTpl) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	var sqlResult sql.Result
 	var err error
 
@@ -175,7 +232,7 @@ func (s *SqlxTpl) NamedExec(query string, arg interface{}) (sql.Result, error) {
 }
 
 // TxNamedExec executes the query with a transaction
-func (s *SqlxTpl) TxNamedExec(tx *sqlx.Tx, query string, arg interface{}) (sql.Result, error) {
+func (s SqlxTpl) TxNamedExec(tx *sqlx.Tx, query string, arg interface{}) (sql.Result, error) {
 	if tx == nil {
 		return nil, sqlxdb.NewDatabaseError("Tx is not a valid instance.")
 	}
