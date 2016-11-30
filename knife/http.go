@@ -2,11 +2,13 @@ package knife
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +17,13 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/justinas/alice"
 )
+
+// SupressError sets if http error should be sent
+var SupressError bool
+
+func init() {
+	flag.BoolVar(&SupressError, "koala_knife_supress_error", true, "suppress error")
+}
 
 // RouteParams represents the params for a route
 type RouteParams struct {
@@ -37,17 +46,6 @@ func (p RouteParams) AsInt(name string) int {
 	return i
 }
 
-// GetRouteParams gets the URL params of the route
-func GetRouteParams(request *http.Request) RouteParams {
-	var params httprouter.Params
-
-	if ps := context.Get(request, "params"); ps != nil {
-		params = ps.(httprouter.Params)
-	}
-
-	return RouteParams{params}
-}
-
 // HTTPRouterWrapHandler wraps the http.Handler with a httprouter.Handle
 // The httprouter.Handle supports better parse of URL params
 func HTTPRouterWrapHandler(h http.Handler) httprouter.Handle {
@@ -64,12 +62,10 @@ type HTTPMethod func(string, httprouter.Handle)
 type Router struct {
 	*httprouter.Router
 
-	routes Routes
-
+	routes         Routes
 	middlewares    []Middleware
 	middlewaresMap MiddlewaresMap
-
-	errorHandler ErrorHandler
+	errorHandler   ErrorHandler
 }
 
 // Routes represents the map de routes
@@ -169,24 +165,158 @@ func (r *Router) HEAD(token string, path string, h Handler) *Route {
 	return NewRoute(token, r.Router.HEAD, path, h)
 }
 
+// Request represents the server request
+type Request struct {
+	httpRequest *http.Request
+}
+
+// Body represents the request body
+type Body struct {
+	reader io.Reader
+}
+
+// NewBody creates a Body instance
+func NewBody(r io.Reader) Body {
+	return Body{r}
+}
+
+// UnMarshalJSON parses the JSON into the body
+func (b Body) UnMarshalJSON(v interface{}) error {
+	body, err := ioutil.ReadAll(b.reader)
+	if err != nil {
+		format := fmt.Sprintf("It was not possible to read body json. Origin - %s", err.Error())
+		return NewUnMarshalError(format)
+	}
+	return UnMarshalJSON(body, v)
+}
+
+// Body gets the request body
+func (r Request) Body() Body {
+	return NewBody(r.httpRequest.Body)
+}
+
+// HTTPRequest gests the pointer of *http.Request
+func (r Request) HTTPRequest() *http.Request {
+	return r.httpRequest
+}
+
+// Params gets the request params
+func (r Request) Params() RouteParams {
+	var params httprouter.Params
+
+	if ps := context.Get(r.HTTPRequest(), "params"); ps != nil {
+		params = ps.(httprouter.Params)
+	}
+
+	return RouteParams{params}
+}
+
+// NewRequest creates an instance of Request
+func NewRequest(r *http.Request) *Request {
+	return &Request{r}
+}
+
 // Response represents the server response
 type Response struct {
-	Status int
-	Bytes  []byte
+	writer      http.ResponseWriter
+	contentType string
+	status      int
+	bytes       []byte
 }
 
-// NewResponse creates a instance of Response
-func NewResponse(s int, b []byte) Response {
-	return Response{s, b}
+// NewResponse creates an instance of Response
+func NewResponse(w http.ResponseWriter) Response {
+	return Response{contentType: "text/html", writer: w}
 }
 
-// Handler defines a interface to be used by structs
+// Writer gets the http response writer
+func (r Response) Writer() http.ResponseWriter {
+	return r.writer
+}
+
+// SetContentType sets the response content type
+func (r *Response) SetContentType(s string) {
+	r.contentType = s
+}
+
+// ContentType gets the response content type
+func (r Response) ContentType() string {
+	return r.contentType
+}
+
+// SetBytes sets the response bytes
+func (r *Response) SetBytes(b []byte) {
+	r.bytes = b
+}
+
+// Bytes gets the response bytes
+func (r Response) Bytes() []byte {
+	return r.bytes
+}
+
+// SetStatus sets the response status
+func (r *Response) SetStatus(s int) {
+	r.status = s
+}
+
+// Status gets the response status
+func (r Response) Status() int {
+	return r.status
+}
+
+// Ok creates an ok response
+func (r Response) Ok(bytes []byte) (Response, error) {
+	r.SetBytes(bytes)
+	return r, nil
+}
+
+// JSON creates a JSON response from v
+func (r Response) JSON(v interface{}) (Response, error) {
+	bytes, err := MarshalJSON(v)
+
+	if err != nil {
+		return r, err
+	}
+
+	r.SetContentType("application/json")
+
+	return r.Ok(bytes)
+}
+
+// NoContent creates a NoContent response
+func (r Response) NoContent() (Response, error) {
+	r.SetStatus(http.StatusNoContent)
+	return r, nil
+}
+
+// NotFound creates a NotFound response
+func (r Response) NotFound() (Response, error) {
+	r.SetStatus(http.StatusNotFound)
+	return r, nil
+}
+
+// ServerError creates an InternalServerError response
+func (r Response) ServerError(err error) (Response, error) {
+	r.SetStatus(http.StatusInternalServerError)
+	return r, err
+}
+
+// BadRequest creates a BadRequest response
+func BadRequest(err error) (Response, error) {
+	r := Response{}
+
+	r.SetStatus(http.StatusBadRequest)
+
+	return r, err
+}
+
+// Handler defines an interface to be used by structs
 type Handler interface {
-	ServeHTTP(http.ResponseWriter, *http.Request) (Response, error)
+	ServeHTTP(Response, *Request) (Response, error)
 }
 
 // HandlerFunc represents the routes created from a function
-type HandlerFunc func(http.ResponseWriter, *http.Request) (Response, error)
+type HandlerFunc func(Response, *Request) (Response, error)
 
 func (r *Router) applyErrorHandler(h HandlerFunc) HandlerFunc {
 	return r.errorHandler(h)
@@ -194,27 +324,28 @@ func (r *Router) applyErrorHandler(h HandlerFunc) HandlerFunc {
 
 func (r *Router) responseMiddleware(h HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		response, err := h(w, req)
+		resp, err := h(NewResponse(w), NewRequest(req))
 
-		status := response.Status
+		s := resp.Status()
 
-		if status == 0 {
+		if s == 0 {
 			if err != nil {
-				status = http.StatusInternalServerError
+				s = http.StatusInternalServerError
 			} else {
-				status = http.StatusOK
+				s = http.StatusOK
 			}
 		}
 
-		w.WriteHeader(status)
+		w.Header().Set("Content-Type", resp.ContentType())
+		w.WriteHeader(s)
 
-		if bytes := response.Bytes; len(bytes) > 0 {
-			w.Write(response.Bytes)
+		if bytes := resp.Bytes(); len(bytes) > 0 {
+			w.Write(resp.Bytes())
 		}
 	}
 }
 
-// Start configures all steps for each route.
+// Start configures all necessary steps for each route.
 // The router starts the middlewares chain with the context.ClearHandler.
 // It is responsible to clear all data in the request context.
 // After, it configures specific middlewares for a route or adds all.
@@ -323,21 +454,14 @@ func (m *MiddlewareManager) Add(token string, constructor alice.Constructor) {
 // ErrorHandler represents the global error handler
 type ErrorHandler func(HandlerFunc) HandlerFunc
 
-// Error Represents an error sent as response
+// Error represents errors sent as response
 type Error struct {
 	Message []string `json:"errors"`
 }
 
 // NewError creates an instance of Error
-func NewError(message ...string) *Error {
-	return &Error{message}
-}
-
-// HTTPError writes for the response object
-func HTTPError(w http.ResponseWriter, status int, v interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+func NewError(message ...string) Error {
+	return Error{message}
 }
 
 // PanicRecoverMiddleware recovers a panic error
@@ -345,9 +469,12 @@ func PanicRecoverMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
-				if err, ok := r.(error); ok {
-					HTTPError(w, http.StatusInternalServerError,
-						NewError(err.Error()))
+				if _, ok := r.(error); ok {
+					w.WriteHeader(http.StatusInternalServerError)
+
+					if SupressError == false {
+						w.Write(debug.Stack())
+					}
 				}
 			}
 		}()
@@ -363,9 +490,7 @@ func JSONContentTypeMiddleware(next http.Handler) http.Handler {
 		if (r.Method == "POST" || r.Method == "PUT") &&
 			r.Header.Get("Content-Type") != "application/json" {
 
-			status := http.StatusUnsupportedMediaType
-
-			HTTPError(w, status, NewError(http.StatusText(status)))
+			w.WriteHeader(http.StatusUnsupportedMediaType)
 
 			return
 		}
@@ -374,17 +499,7 @@ func JSONContentTypeMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// UnMarshalJSONFromReader parses the json from a Reader and stores in v interface
-func UnMarshalJSONFromReader(r io.Reader, v interface{}) error {
-	body, err := ioutil.ReadAll(r)
-	if err != nil {
-		format := fmt.Sprintf("It was not possible to read body json. Origin - %s", err.Error())
-		return NewUnMarshalError(format)
-	}
-	return UnMarshalJSON(body, v)
-}
-
-// UnMarshalJSON the JSON-encoded data and stores in v interface
+// UnMarshalJSON parses the JSON-encoded data and stores in v interface
 func UnMarshalJSON(data []byte, v interface{}) error {
 	err := json.Unmarshal(data, v)
 	if err != nil {
@@ -399,8 +514,8 @@ func MarshalJSON(v interface{}) ([]byte, error) {
 	return json.Marshal(v)
 }
 
-// JSONError creates a json bytes of Error
-func JSONError(message ...string) ([]byte, error) {
+// ErrorAsJSON creates a JSON representation of Error
+func ErrorAsJSON(message ...string) ([]byte, error) {
 	return json.Marshal(&Error{message})
 }
 
