@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/rs/cors"
 	"github.com/tralus/koala/config"
 	"github.com/tralus/koala/knife"
 )
@@ -37,18 +38,24 @@ type Module interface {
 
 // App represents a Koala Application
 type App struct {
+	cors    *cors.Cors
 	router  *knife.Router
 	modules []Module
 }
 
 // NewApplication creates an instance of App
-func NewApplication(r *knife.Router) App {
-	return App{router: r}
+func NewApplication(r *knife.Router, cors *cors.Cors) App {
+	return App{cors: cors, router: r}
 }
 
 // SetRouter sets the application router
 func (a *App) SetRouter(r *knife.Router) {
 	a.router = r
+}
+
+// SetCors sets CORS support for the application
+func (a *App) SetCors(c *cors.Cors) {
+	a.cors = c
 }
 
 // AddModules adds the modules for the application
@@ -90,9 +97,18 @@ func (a *App) Run() error {
 	fmt.Printf("On http://localhost%s\n", ServerPort)
 	fmt.Println("To shut down, press <CTRL> + C.")
 
+	// Starts the router
+	handler := a.router.Start()
+
+	if a.cors != nil {
+		// Starts the server with CORS support
+		return http.ListenAndServe(
+			ServerPort, a.cors.Handler(handler),
+		)
+	}
+
 	// Starts the server
 	return http.ListenAndServe(
-		ServerPort,
-		http.Handler(a.router.Start()),
+		ServerPort, handler,
 	)
 }
