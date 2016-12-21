@@ -22,7 +22,7 @@ import (
 var SupressError bool
 
 func init() {
-	flag.BoolVar(&SupressError, "koala_knife_supress_error", true, "suppress error")
+	flag.BoolVar(&SupressError, "koala_knife_supress_error", false, "suppress error")
 }
 
 // RouteParams represents the params for a route
@@ -328,12 +328,19 @@ func (r *Router) responseMiddleware(h HandlerFunc) http.HandlerFunc {
 
 		s := resp.Status()
 
-		if s == 0 {
-			if err != nil {
-				s = http.StatusInternalServerError
-			} else {
-				s = http.StatusOK
+		// Ensures that the Internal Server can be defined without response body
+		if (s == 0 && err != nil) || s == http.StatusInternalServerError {
+			if err != nil && SupressError == false {
+				bytes, err := ErrorAsJSON(err.Error())
+
+				if err != nil {
+					bytes = []byte(err.Error())
+				}
+
+				resp.SetBytes(bytes)
 			}
+		} else if s == 0 {
+			s = http.StatusOK
 		}
 
 		w.Header().Set("Content-Type", resp.ContentType())
