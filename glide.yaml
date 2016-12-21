@@ -18,3 +18,5 @@ import:
   version: ~3.1.0
 - package: gopkg.in/yaml.v2
 - package: github.com/rubenv/sql-migrate
+- package: github.com/rs/cors
+  version: ~1.0.0
