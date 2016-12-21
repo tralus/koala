@@ -22,7 +22,6 @@ func init() {
 
 // Config represents the application settings
 type Config struct {
-	Cors  bool
 	Debug bool
 
 	Session struct {
