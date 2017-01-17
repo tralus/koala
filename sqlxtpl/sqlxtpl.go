@@ -65,21 +65,54 @@ type SqlxTpl struct {
 	DB *sqlx.DB
 }
 
-// UnsafeQueryx executes unsafe query on the database connection
-func (s SqlxTpl) UnsafeQueryx(query string) (*sqlx.Rows, error) {
-	rows, err := s.DB.Unsafe().Queryx(query)
+// ParseRows is used as a callback function to parse query result
+type ParseRows func(r *sqlx.Rows) error
 
+// This function is used like an unique point to process rows.
+// The parse function passes the next row for the caller to work.
+func processRows(rows *sqlx.Rows, err error, parse ParseRows) error {
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return rows, NewEmptyResultDataError("Empty result data.")
+			return NewEmptyResultDataError("Empty result data.")
 		}
-		return rows, sqlxdb.NewDatabaseError(err.Error())
+
+		return sqlxdb.NewDatabaseError(err.Error())
 	}
 
-	return rows, nil
+	for rows.Next() {
+		if err = parse(rows); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-// UnsafeSelect executes unsafe select on the database connection
+// NamedQuery executes a safe named query
+func (s SqlxTpl) NamedQuery(query string, arg interface{}, parse ParseRows) error {
+	rows, err := s.DB.NamedQuery(query, arg)
+	return processRows(rows, err, parse)
+}
+
+// UnsafeNamedQuery executes an unsafe named query
+func (s SqlxTpl) UnsafeNamedQuery(query string, arg interface{}, parse ParseRows) error {
+	rows, err := s.DB.Unsafe().NamedQuery(query, arg)
+	return processRows(rows, err, parse)
+}
+
+// Queryx executes a safe query
+func (s SqlxTpl) Queryx(query string, args []interface{}, parse ParseRows) error {
+	rows, err := s.DB.Queryx(query, args...)
+	return processRows(rows, err, parse)
+}
+
+// UnsafeQueryx executes an unsafe query
+func (s SqlxTpl) UnsafeQueryx(query string, parse ParseRows, args ...interface{}) error {
+	rows, err := s.DB.Unsafe().Queryx(query, args...)
+	return processRows(rows, err, parse)
+}
+
+// UnsafeSelect executes an unsafe select
 func (s SqlxTpl) UnsafeSelect(dest interface{}, query string, args ...interface{}) error {
 	err := s.DB.Unsafe().Select(dest, query, args...)
 
@@ -93,7 +126,7 @@ func (s SqlxTpl) UnsafeSelect(dest interface{}, query string, args ...interface{
 	return nil
 }
 
-// Select executes safe select on the database connection
+// Select executes a safe select
 func (s SqlxTpl) Select(dest interface{}, query string, args ...interface{}) error {
 	err := s.DB.Select(dest, query, args...)
 
@@ -210,25 +243,22 @@ func Commit(tx *sqlx.Tx) error {
 	return nil
 }
 
-// NamedExec executes a query
+// NamedExec executes a namedexec query
 // If a transaction is setted, the query runs over it
-func (s SqlxTpl) NamedExec(query string, arg interface{}) (sql.Result, error) {
-	var sqlResult sql.Result
-	var err error
+func (s SqlxTpl) NamedExec(query string, arg interface{}) (result sql.Result, err error) {
+	tx := s.Tx()
 
-	t := s.Tx()
-
-	if t != nil {
-		sqlResult, err = t.NamedExec(query, arg)
+	if tx != nil {
+		result, err = tx.NamedExec(query, arg)
 	} else {
-		sqlResult, err = s.DB.NamedExec(query, arg)
+		result, err = s.DB.NamedExec(query, arg)
 	}
 
 	if err != nil {
 		return nil, sqlxdb.NewDatabaseError(err.Error())
 	}
 
-	return sqlResult, nil
+	return
 }
 
 // TxNamedExec executes the query with a transaction
