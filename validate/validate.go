@@ -146,6 +146,17 @@ func EqChoiceString(v string, choices ChoicesString) error {
 	return NewArgumentError(notValidateMsg(v, s))
 }
 
+// NotZeroString verifies if s is not empty
+func NotZeroString(s string) error {
+	valid := utf8.RuneCountInString(s) != 0
+
+	if !valid {
+		return NewArgumentError("Non zero string required.")
+	}
+
+	return nil
+}
+
 // NotZero verifies if the v is a zero value on Go
 func NotZero(v interface{}) error {
 	st := reflect.ValueOf(v)
