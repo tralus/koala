@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
 	"net/http"
+	"net/url"
 	"regexp"
 	"runtime/debug"
 	"strconv"
@@ -193,6 +195,11 @@ func (b Body) UnMarshalJSON(v interface{}) error {
 // Body gets the request body
 func (r Request) Body() Body {
 	return NewBody(r.httpRequest.Body)
+}
+
+// URL gets the request URL
+func (r Request) URL() *url.URL {
+	return r.httpRequest.URL
 }
 
 // HTTPRequest gests the pointer of *http.Request
@@ -491,13 +498,20 @@ func PanicRecoverMiddleware(next http.Handler) http.Handler {
 }
 
 // JSONContentTypeMiddleware forces application/json Content-Type
-// It forces only when the http method is PUT or POST
 func JSONContentTypeMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if (r.Method == "POST" || r.Method == "PUT") &&
-			r.Header.Get("Content-Type") != "application/json" {
+		mediatype, params, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		charset, ok := params["charset"]
+
+		if !ok {
+			charset = "UTF-8"
+		}
+
+		if r.ContentLength > 0 &&
+			!(mediatype == "application/json" && strings.ToUpper(charset) == "UTF-8") {
 
 			w.WriteHeader(http.StatusUnsupportedMediaType)
+			w.Write([]byte("Bad Content-Type or charset, expected 'application/json' and 'UTF-8'."))
 
 			return
 		}
