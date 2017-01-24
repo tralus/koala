@@ -13,7 +13,6 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gorilla/context"
 	"github.com/julienschmidt/httprouter"
@@ -338,12 +337,7 @@ func (r *Router) responseMiddleware(h HandlerFunc) http.HandlerFunc {
 		// Ensures that the Internal Server can be defined without response body
 		if (s == 0 && err != nil) || s == http.StatusInternalServerError {
 			if err != nil && SupressError == false {
-				bytes, err := ErrorAsJSON(err.Error())
-
-				if err != nil {
-					bytes = []byte(err.Error())
-				}
-
+				bytes := []byte(err.Error())
 				resp.SetBytes(bytes)
 			}
 		} else if s == 0 {
@@ -383,7 +377,9 @@ func (r *Router) Start() *Router {
 				}
 			} else {
 				for _, middleware := range middlewares {
-					chain = chain.Append(middleware.Constructor)
+					if middleware.Silent == false {
+						chain = chain.Append(middleware.Constructor)
+					}
 				}
 			}
 
@@ -425,6 +421,7 @@ func NewRouteFunc(token string, method HTTPMethod, path string, handler HandlerF
 type Middleware struct {
 	Token       string
 	Constructor alice.Constructor
+	Silent      bool
 }
 
 // MiddlewaresMap represents the middlewares map.
@@ -462,20 +459,25 @@ type MiddlewareManager struct {
 
 // Add adds a middleware to the middlewares chain
 func (m *MiddlewareManager) Add(token string, constructor alice.Constructor) {
-	m.Middlewares = append(m.Middlewares, Middleware{token, constructor})
+	m.Middlewares = append(m.Middlewares, Middleware{token, constructor, false})
+}
+
+// AddSilent adds a silent middleware to the middlewares chain
+func (m *MiddlewareManager) AddSilent(token string, constructor alice.Constructor) {
+	m.Middlewares = append(m.Middlewares, Middleware{token, constructor, true})
 }
 
 // ErrorHandler represents the global error handler
 type ErrorHandler func(HandlerFunc) HandlerFunc
 
-// Error represents errors sent as response
-type Error struct {
+// ErrorMessage represents errors sent as response
+type ErrorMessage struct {
 	Message []string `json:"errors"`
 }
 
-// NewError creates an instance of Error
-func NewError(message ...string) Error {
-	return Error{message}
+// NewErrorMessage creates a ErrorMessages instance
+func NewErrorMessage(message ...string) ErrorMessage {
+	return ErrorMessage{message}
 }
 
 // PanicRecoverMiddleware recovers a panic error
@@ -535,11 +537,6 @@ func MarshalJSON(v interface{}) ([]byte, error) {
 	return json.Marshal(v)
 }
 
-// ErrorAsJSON creates a JSON representation of Error
-func ErrorAsJSON(message ...string) ([]byte, error) {
-	return json.Marshal(&Error{message})
-}
-
 // UnMarshalError represents an unmarshal error
 type UnMarshalError struct {
 	Msg string
@@ -559,21 +556,4 @@ func (v UnMarshalError) Error() string {
 // NewUnMarshalError an instance of UnMarshalError
 func NewUnMarshalError(msg string) UnMarshalError {
 	return UnMarshalError{msg}
-}
-
-// GetSimpleNetClient gets an instance of http.Client
-func GetSimpleNetClient(secs int) *http.Client {
-	if secs == 0 {
-		secs = 30
-	}
-
-	return &http.Client{
-		Timeout: time.Second * time.Duration(secs),
-	}
-}
-
-// URLParams generates an url with params
-// The url is generated from one string format via Sprintf
-func URLParams(url string, p ...interface{}) string {
-	return fmt.Sprintf(url, p...)
 }
