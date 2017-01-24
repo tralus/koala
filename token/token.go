@@ -11,6 +11,8 @@ import (
 	"github.com/tralus/koala/auth"
 )
 
+const keyTokenContext = "koala.token.0"
+
 // Token represents a Token
 type Token struct {
 	Value string `json:"token"`
@@ -108,4 +110,25 @@ func (s JwtTokenService) GenerateToken(details auth.UserDetails) (Token, error) 
 	}
 
 	return New(tokenString), nil
+}
+
+// ToContext puts a Token instance to the request context
+func ToContext(r *http.Request, t Token) {
+	context.Set(r, keyTokenContext, t)
+}
+
+// FromContext gets a Token instance from the request context
+func FromContext(r *http.Request) (Token, error) {
+	var token Token
+
+	if u := context.Get(r, keyTokenContext); u != nil {
+		token, ok := u.(Token)
+		if !ok {
+			m := "The token into context is not a Token instance."
+			return token, errors.New(m)
+		}
+		return token, nil
+	}
+
+	return token, errors.New("Key " + keyTokenContext + " not found in the context.")
 }
