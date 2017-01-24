@@ -9,6 +9,8 @@ import (
 	"github.com/tralus/koala/errors"
 )
 
+const keyUserContext = "koala.auth.0"
+
 // UsernameExistsError represents error for username exists logic
 type UsernameExistsError struct {
 	Msg   string
@@ -101,20 +103,25 @@ type UserDetails struct {
 	IsActive bool
 }
 
-// ContextUser gets an UserDetails instance from request context
-func ContextUser(r *http.Request) (UserDetails, error) {
+// ToContext puts an UserDetails instance to the request context
+func ToContext(r *http.Request, u UserDetails) {
+	context.Set(r, keyUserContext, u)
+}
+
+// FromContext gets an UserDetails instance from the request context
+func FromContext(r *http.Request) (UserDetails, error) {
 	var details UserDetails
 
-	if u := context.Get(r, "user"); u != nil {
+	if u := context.Get(r, keyUserContext); u != nil {
 		details, ok := u.(UserDetails)
 		if !ok {
-			message := "The user on context is not an UserDetails instance."
-			return details, errors.New(message)
+			m := "The user into context is not an UserDetails instance."
+			return details, errors.New(m)
 		}
 		return details, nil
 	}
 
-	return details, errors.New("Key user not found on context.")
+	return details, errors.New("Key " + keyUserContext + " not found in the context.")
 }
 
 // UserDetailsService defines an interface to implement UserDetails logic
