@@ -3,15 +3,14 @@ package token
 import (
 	"errors"
 	"net/http"
-	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 
 	"github.com/gorilla/context"
-	"github.com/tralus/koala/auth"
 )
 
 const keyTokenContext = "koala.token.0"
+const keyJwtClaimsContext = "koala.jwt.claims.0"
 
 // Token represents a Token
 type Token struct {
@@ -23,10 +22,10 @@ func New(value string) Token {
 	return Token{value}
 }
 
-// Service defines an interface for a token service
-type Service interface {
-	GenerateToken(details auth.UserDetails) (Token, error)
-}
+// // Service defines an interface for a token service
+// type Service interface {
+// 	GenerateToken(details auth.UserDetails) (Token, error)
+// }
 
 // JwtConfig represents the jwt settings
 type JwtConfig struct {
@@ -43,73 +42,31 @@ func NewJwtConfig(e int, s string) JwtConfig {
 	return JwtConfig{e, s}
 }
 
-// JwtTokenService represents a jwt token service
+// JwtToken represents a jwt token service
 // It uses an AuthService for the authentication logic
 // It generates a jwt token from UserDetails data
-type JwtTokenService struct {
-	AuthService   auth.DefaultService
+type JwtToken struct {
+	// AuthService   auth.DefaultService
 	SigningMethod jwt.SigningMethod
 	JwtConfig     JwtConfig
 }
 
-// NewJwtTokenService creates a new instancer of JwtTokenService
-func NewJwtTokenService(a auth.DefaultService, m jwt.SigningMethod, c JwtConfig) JwtTokenService {
-	return JwtTokenService{a, m, c}
-}
-
-// GetJwtClaimns gets the claimn param from request context
-func GetJwtClaimns(r *http.Request, key string) (interface{}, error) {
-	if c := context.Get(r, "jwtClaimns"); c != nil {
-		claimns := c.(map[string]interface{})
-
-		if v, ok := claimns[key]; ok {
-			return v, nil
-		}
-	}
-
-	return nil, errors.New("JWT Claimns with key " + key + " not found.")
-}
-
-// Authenticate authenticates via AuthService and generates a jwt token
-func (s JwtTokenService) Authenticate(username string, pwd string) (Token, error) {
-	var token Token
-
-	user, err := s.AuthService.Authenticate(username, pwd)
-
-	if err != nil {
-		return token, err
-	}
-
-	token, err = s.GenerateToken(user)
-
-	if err != nil {
-		return token, err
-	}
-
-	return token, nil
+// NewJwtToken creates a new instancer of JwtTokenService
+func NewJwtToken(m jwt.SigningMethod, c JwtConfig) JwtToken {
+	return JwtToken{m, c}
 }
 
 // GenerateToken generates a token with UserDetails data
-func (s JwtTokenService) GenerateToken(details auth.UserDetails) (Token, error) {
-	var token Token
-
-	duration := time.Hour * time.Duration(s.JwtConfig.Exp)
-
-	claims := &jwt.StandardClaims{
-		ExpiresAt: time.Now().Add(duration).Unix(),
-		IssuedAt:  time.Now().Unix(),
-		Id:        details.Username,
-	}
-
+func (s JwtToken) GenerateToken(claims jwt.Claims) (t Token, err error) {
 	jwtToken := jwt.NewWithClaims(s.SigningMethod, claims)
 
-	tokenString, err := jwtToken.SignedString([]byte(s.JwtConfig.Secret))
+	tokenStr, err := jwtToken.SignedString([]byte(s.JwtConfig.Secret))
 
 	if err != nil {
-		return token, err
+		return t, err
 	}
 
-	return New(tokenString), nil
+	return New(tokenStr), nil
 }
 
 // ToContext puts a Token instance to the request context
@@ -121,14 +78,45 @@ func ToContext(r *http.Request, t Token) {
 func FromContext(r *http.Request) (Token, error) {
 	var token Token
 
-	if u := context.Get(r, keyTokenContext); u != nil {
-		token, ok := u.(Token)
-		if !ok {
-			m := "The token into context is not a Token instance."
-			return token, errors.New(m)
-		}
-		return token, nil
+	u := context.Get(r, keyTokenContext)
+
+	if u == nil {
+		errMsg := "Token (" + keyTokenContext + ") is not into context."
+		return token, errors.New(errMsg)
 	}
 
-	return token, errors.New("Key " + keyTokenContext + " not found in the context.")
+	token, ok := u.(Token)
+
+	if !ok {
+		errMsg := "The token into context is not a Token instance."
+		return token, errors.New(errMsg)
+	}
+
+	return token, nil
+}
+
+// JwtClaimsToContext puts claims to the request context
+func JwtClaimsToContext(r *http.Request, c *jwt.StandardClaims) {
+	context.Set(r, keyJwtClaimsContext, c)
+}
+
+// JwtClaimsFromContext gets claims from the request context
+func JwtClaimsFromContext(r *http.Request) (jwt.StandardClaims, error) {
+	var claims jwt.StandardClaims
+
+	u := context.Get(r, keyJwtClaimsContext)
+
+	if u == nil {
+		errMsg := "StandardClaims (" + keyJwtClaimsContext + ") is not into context."
+		return claims, errors.New(errMsg)
+	}
+
+	claims, ok := u.(jwt.StandardClaims)
+
+	if !ok {
+		errMsg := "The claims into context is not a StandardClaims instance."
+		return claims, errors.New(errMsg)
+	}
+
+	return claims, nil
 }
