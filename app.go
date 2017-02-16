@@ -23,7 +23,7 @@ func init() {
 	var err error
 
 	// Sets the server host
-	flag.StringVar(&ServerHost, "host", "", "server host")
+	flag.StringVar(&ServerHost, "host", "localhost", "server host")
 
 	// Sets the server port
 	flag.StringVar(&ServerPort, "port", "9003", "server port")
@@ -100,7 +100,7 @@ func (a *App) Run() error {
 	fmt.Printf("Port: %s\n", ServerPort)
 
 	fmt.Println(sep())
-	fmt.Printf("On http://localhost%s\n", ServerPort)
+	fmt.Printf("On http://%s:%s\n", ServerHost, ServerPort)
 	fmt.Println("To shut down, press <CTRL> + C.")
 
 	// Starts the router
