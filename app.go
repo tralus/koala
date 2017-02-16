@@ -20,18 +20,6 @@ var ServerHost string
 var ServerPort string
 
 func init() {
-	ServerPort = os.Getenv("PORT")
-
-	if len(ServerPort) == 0 {
-		ServerPort = "9003"
-	}
-
-	ServerHost = os.Getenv("HOST")
-
-	if len(ServerHost) == 0 {
-		ServerHost = "localhost"
-	}
-
 	var err error
 
 	// Loads the application config
@@ -99,6 +87,18 @@ func (a *App) Run() error {
 	// Up application modules
 	for _, m := range a.modules {
 		m.Up()
+	}
+
+	ServerPort = os.Getenv("PORT")
+
+	if len(ServerPort) == 0 {
+		ServerPort = "9003"
+	}
+
+	ServerHost = os.Getenv("HOST")
+
+	if len(ServerHost) == 0 {
+		ServerHost = "localhost"
 	}
 
 	hostAndPort := ServerHost + ":" + ServerPort
