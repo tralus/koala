@@ -1,10 +1,10 @@
 package koala
 
 import (
-	"flag"
 	"fmt"
 	"net/http"
 
+	"github.com/namsral/flag"
 	"github.com/rs/cors"
 	"github.com/tralus/koala/config"
 	"github.com/tralus/koala/knife"
@@ -13,14 +13,20 @@ import (
 // Config holds the app config
 var Config config.Config
 
-// ServerPort holds the port of tht server
+// ServerHost holds the host
+var ServerHost string
+
+// ServerPort holds the port
 var ServerPort string
 
 func init() {
 	var err error
 
-	// Sets the server port of the application
-	flag.StringVar(&ServerPort, "koala_server_port", ":9003", "server port")
+	// Sets the server host
+	flag.StringVar(&ServerHost, "host", "", "server host")
+
+	// Sets the server port
+	flag.StringVar(&ServerPort, "port", "9003", "server port")
 
 	// Loads the application config
 	Config, err = config.LoadConfig()
@@ -103,12 +109,12 @@ func (a *App) Run() error {
 	if a.cors != nil {
 		// Starts the server with CORS support
 		return http.ListenAndServe(
-			ServerPort, a.cors.Handler(handler),
+			":"+ServerPort, a.cors.Handler(handler),
 		)
 	}
 
 	// Starts the server
 	return http.ListenAndServe(
-		ServerPort, handler,
+		ServerHost+":"+ServerPort, handler,
 	)
 }
