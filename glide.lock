@@ -1,5 +1,5 @@
 hash: 99fb2f6a0452a1c2223b3d1b588584737da2d93653ac17dd52fe3ff1e96d4bff
-updated: 2017-02-16T15:30:18.886496343-03:00
+updated: 2017-02-16T17:00:08.557123253-03:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: fdf19785fd3558d619ef81212f5edf1d6c2a5911
@@ -26,11 +26,11 @@ imports:
 - name: github.com/rs/xhandler
   version: ed27b6fd65218132ee50cd95f38474a3d8a2cd12
 - name: github.com/rubenv/sql-migrate
-  version: 1ed79968dfca5de79adb13c84523caaa4fc865a9
+  version: f64b6080c334adaf843209164107439e92bb170b
   subpackages:
   - sqlparse
 - name: golang.org/x/net
-  version: f2499483f923065a842d38eb4c7f1927e6fc6e6d
+  version: b4690f45fa1cafc47b1c280c2e75116efe40cc13
   subpackages:
   - context
 - name: gopkg.in/gorp.v1
@@ -38,5 +38,5 @@ imports:
 - name: gopkg.in/guregu/null.v3
   version: 41961cea0328defc5f95c1c473f89ebf0d1813f6
 - name: gopkg.in/yaml.v2
-  version: a83829b6f1293c91addabc89d0571c246397bbf4
+  version: a5b47d31c556af34a302ce5d659e6fea44d90de0
 testImports: []
