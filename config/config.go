@@ -8,16 +8,18 @@ import (
 	"text/template"
 
 	"gopkg.in/yaml.v2"
-
-	"github.com/namsral/flag"
 )
 
 // ConfigFilename settings filename
 var ConfigFilename string
 
 func init() {
-	// Sets the config filename of the application
-	flag.StringVar(&ConfigFilename, "koala_config_filename", "app.yml", "config filename")
+	// Gets the config filename from env var
+	ConfigFilename = os.Getenv("CONFIG_FILENAME")
+
+	if len(ConfigFilename) == 0 {
+		ConfigFilename = "app.yml"
+	}
 }
 
 // Config represents the application settings

@@ -3,8 +3,8 @@ package koala
 import (
 	"fmt"
 	"net/http"
+	"os"
 
-	"github.com/namsral/flag"
 	"github.com/rs/cors"
 	"github.com/tralus/koala/config"
 	"github.com/tralus/koala/knife"
@@ -13,20 +13,26 @@ import (
 // Config holds the app config
 var Config config.Config
 
-// ServerHost holds the host
+// ServerHost holds the server host
 var ServerHost string
 
-// ServerPort holds the port
+// ServerPort holds the server port
 var ServerPort string
 
 func init() {
+	ServerPort = os.Getenv("PORT")
+
+	if len(ServerPort) == 0 {
+		ServerPort = "9003"
+	}
+
+	ServerHost = os.Getenv("HOST")
+
+	if len(ServerHost) == 0 {
+		ServerHost = "localhost"
+	}
+
 	var err error
-
-	// Sets the server host
-	flag.StringVar(&ServerHost, "host", "localhost", "server host")
-
-	// Sets the server port
-	flag.StringVar(&ServerPort, "port", "9003", "server port")
 
 	// Loads the application config
 	Config, err = config.LoadConfig()
@@ -95,12 +101,14 @@ func (a *App) Run() error {
 		m.Up()
 	}
 
+	hostAndPort := ServerHost + ":" + ServerPort
+
 	fmt.Println(sep())
 	fmt.Printf("Debug: %t\n", Config.Debug)
 	fmt.Printf("Port: %s\n", ServerPort)
 
 	fmt.Println(sep())
-	fmt.Printf("On http://%s:%s\n", ServerHost, ServerPort)
+	fmt.Printf("On http://%s\n", hostAndPort)
 	fmt.Println("To shut down, press <CTRL> + C.")
 
 	// Starts the router
@@ -109,12 +117,12 @@ func (a *App) Run() error {
 	if a.cors != nil {
 		// Starts the server with CORS support
 		return http.ListenAndServe(
-			ServerHost+":"+ServerPort, a.cors.Handler(handler),
+			hostAndPort, a.cors.Handler(handler),
 		)
 	}
 
 	// Starts the server
 	return http.ListenAndServe(
-		ServerHost+":"+ServerPort, handler,
+		hostAndPort, handler,
 	)
 }
