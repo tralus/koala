@@ -109,7 +109,7 @@ func (a *App) Run() error {
 	if a.cors != nil {
 		// Starts the server with CORS support
 		return http.ListenAndServe(
-			":"+ServerPort, a.cors.Handler(handler),
+			ServerHost+":"+ServerPort, a.cors.Handler(handler),
 		)
 	}
 
