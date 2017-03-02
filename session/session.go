@@ -23,47 +23,24 @@ func NewCookieStore(c Config) *sessions.CookieStore {
 	return sessions.NewCookieStore([]byte(c.Secret))
 }
 
-const sessionID = "koala_ssid"
-
-// Store represents a session store
-type Store struct {
-	store    sessions.Store
-	request  *http.Request
-	response http.ResponseWriter
+// Session represents a session
+type Session struct {
+	name    string
+	store   sessions.Store
+	options *sessions.Options
 }
 
-// NewStore creates a new instance of Store
-func NewStore(s sessions.Store, r *http.Request, w http.ResponseWriter) Store {
-	store := Store{s, r, w}
-
-	store.SetOptions(&sessions.Options{
-		Path:     "/",
-		MaxAge:   86400 * 7,
-		HttpOnly: true,
-	})
-
-	return store
-}
-
-// SetOptions sets the session options
-func (j Store) SetOptions(options *sessions.Options) error {
-	s, err := j.store.Get(j.request, sessionID)
-
-	if err != nil {
-		return err
-	}
-
-	s.Options = options
-
-	return s.Save(j.request, j.response)
+// New creates a Session instance
+func New(name string, s sessions.Store, options *sessions.Options) Session {
+	return Session{name, s, options}
 }
 
 // Values represents the values of the session
 type Values map[interface{}]interface{}
 
 // Save saves the token into session cookie
-func (j Store) Save(values Values) error {
-	s, err := j.store.Get(j.request, sessionID)
+func (j Session) Save(r *http.Request, w http.ResponseWriter, values Values) error {
+	s, err := j.store.Get(r, j.name)
 
 	if err != nil {
 		return err
@@ -71,12 +48,12 @@ func (j Store) Save(values Values) error {
 
 	s.Values = values
 
-	return s.Save(j.request, j.response)
+	return s.Save(r, w)
 }
 
-// Get gets the token from session cookie
-func (j Store) Get() (Values, error) {
-	s, err := j.store.Get(j.request, sessionID)
+// Get gets the session values
+func (j Session) Get(r *http.Request) (Values, error) {
+	s, err := j.store.Get(r, j.name)
 
 	if err != nil {
 		return nil, err
@@ -85,15 +62,28 @@ func (j Store) Get() (Values, error) {
 	return s.Values, nil
 }
 
-// Clear cleans the token from session cookie
-func (j Store) Clear() error {
-	s, _ := j.store.Get(j.request, sessionID)
+// Start starts the session with options
+func (j Session) Start(r *http.Request) error {
+	s, err := j.store.Get(r, j.name)
+
+	s.Options = j.options
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Clear clears the token from session cookie
+func (j Session) Clear(r *http.Request, w http.ResponseWriter) error {
+	s, _ := j.store.Get(r, j.name)
 
 	s.Values = nil
 
 	s.Options.MaxAge = -1
 
-	return s.Save(j.request, j.response)
+	return s.Save(r, w)
 }
 
 var m map[string]interface{}
