@@ -168,7 +168,7 @@ func (r *Router) HEAD(token string, path string, h Handler) *Route {
 
 // Request represents the server request
 type Request struct {
-	httpRequest *http.Request
+	target *http.Request
 }
 
 // Body represents the request body
@@ -193,24 +193,24 @@ func (b Body) UnMarshalJSON(v interface{}) error {
 
 // Body gets the request body
 func (r Request) Body() Body {
-	return NewBody(r.httpRequest.Body)
+	return NewBody(r.target.Body)
 }
 
 // URL gets the request URL
 func (r Request) URL() *url.URL {
-	return r.httpRequest.URL
+	return r.target.URL
 }
 
-// HTTPRequest gests the pointer of *http.Request
-func (r Request) HTTPRequest() *http.Request {
-	return r.httpRequest
+// Target gests the pointer of *http.Request
+func (r Request) Target() *http.Request {
+	return r.target
 }
 
 // Params gets the request params
 func (r Request) Params() RouteParams {
 	var params httprouter.Params
 
-	if ps := context.Get(r.HTTPRequest(), "params"); ps != nil {
+	if ps := context.Get(r.target, "params"); ps != nil {
 		params = ps.(httprouter.Params)
 	}
 
