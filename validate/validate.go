@@ -6,35 +6,8 @@ import (
 	"github.com/tralus/koala/errors"
 )
 
-// ArgumentError wraps errors.IllegalArgumentError
-type ArgumentError struct {
-	err error
-}
-
-// Error gets the error message
-func (a ArgumentError) Error() string {
-	return a.err.Error()
-}
-
-// GetStack gets the error stack trace
-func (a ArgumentError) GetStack() string {
-	if e, ok := a.err.(errors.IllegalArgumentError); ok {
-		return e.GetStack()
-	}
-	return ""
-}
-
-// NewArgumentError creates an ArgumentError instance
-func NewArgumentError(m string) ArgumentError {
-	return ArgumentError{
-		errors.NewIllegalArgumentError(m),
-	}
-}
-
-// IsArgumentError verifies if error is a ArgumentError
-func IsArgumentError(err error) bool {
-	_, ok := err.(ArgumentError)
-	return ok
+func newArgumentError(err error) error {
+	return errors.NewIllegalArgumentError(err)
 }
 
 // NotZero verifies if the v is a zero value on Go
@@ -71,11 +44,11 @@ func NotZero(v interface{}) error {
 		valid = true // always valid since only nil pointers are empty
 
 	default:
-		return NewArgumentError("Unsupported type.")
+		return newArgumentError(errors.New("Unsupported type."))
 	}
 
 	if !valid {
-		return NewArgumentError("Non zero value required.")
+		return newArgumentError(errors.New("Non zero value required."))
 	}
 
 	return nil

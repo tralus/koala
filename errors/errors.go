@@ -3,230 +3,161 @@
 package errors
 
 import (
-	"bytes"
-	"runtime"
+	"fmt"
+	"io"
+
+	"github.com/pkg/errors"
 )
 
-// RuntimeError interface exposes additional information about the error.
-type RuntimeError interface {
+// BaseError represents the base error
+type BaseError struct {
+	err error
+}
+
+// Error implements error.Error
+func (e BaseError) Error() string {
+	return fmt.Sprintf("%s", e.err)
+}
+
+// GetStack implements RootError
+func (e BaseError) GetStack() string {
+	return fmt.Sprintf("%+v\n", e)
+}
+
+// Format formats the error message
+func (e BaseError) Format(s fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		if s.Flag('+') {
+			_, _ = fmt.Fprintf(s, "%+v\n", e.err)
+			return
+		}
+		fallthrough
+	case 's':
+		_, _ = io.WriteString(s, e.Error())
+	case 'q':
+		_, _ = fmt.Fprintf(s, "%q", e.Error())
+	}
+}
+
+// NewBaseError creates a BaseError instance
+func NewBaseError(err error) BaseError {
+	return BaseError{err}
+}
+
+// New only wraps errors.New
+func New(m string) error {
+	return errors.New(m)
+}
+
+// Cause only wraps errors.Cause
+func Cause(err error) error {
+	return errors.Cause(err)
+}
+
+// Wrap only wraps errors.Wrap
+func Wrap(err error, m string) error {
+	return errors.Wrap(err, m)
+}
+
+// Errorf only wraps errors.Errorf
+func Errorf(format string, args ...interface{}) error {
+	return errors.Errorf(format, args)
+}
+
+// RootError interface exposes additional information about the error
+type RootError interface {
 	// Returns the stack trace without the error message.
 	GetStack() string
 
 	Error() string
 }
 
-// IsRuntimeError verifies if the error is a RuntimeError
-func IsRuntimeError(e error) bool {
-	_, ok := e.(RuntimeError)
-	return ok
-}
-
-// Error represents a generic error
-// It implements RuntimeError interface
-type Error struct {
-	Msg   string
-	Stack string
-}
-
-// GetStack gets the error stack trace
-func (e Error) GetStack() string {
-	return e.Stack
-}
-
-// Error gets the error message
-func (e Error) Error() string {
-	return e.Msg
-}
-
-// New creates an error from Error
-func New(m string) error {
-	s, _ := StackTrace()
-	return Error{m, s}
-}
-
-// IsError verifies if the error is an Error
-func IsError(e error) bool {
-	_, ok := e.(Error)
+// IsRootError verifies if the error is a RuntimeError
+func IsRootError(e error) bool {
+	_, ok := e.(RootError)
 	return ok
 }
 
 // NotFoundError represents a not found error
 // It implements the RuntimeError interface
 type NotFoundError struct {
-	Msg   string
-	Stack string
-}
-
-// GetStack gets the error stack trace
-func (e NotFoundError) GetStack() string {
-	return e.Stack
-}
-
-// Error gets the error message
-func (e NotFoundError) Error() string {
-	return e.Msg
+	BaseError
 }
 
 // NewNotFoundError creates an error from NotFoundError
-func NewNotFoundError(m string) error {
-	s, _ := StackTrace()
-	return NotFoundError{m, s}
+func NewNotFoundError(err error) error {
+	return NotFoundError{NewBaseError(err)}
 }
 
 // IsNotFoundError verifies if error is a NotFoundError
-func IsNotFoundError(e error) bool {
-	_, ok := e.(NotFoundError)
+func IsNotFoundError(err error) bool {
+	_, ok := errors.Cause(err).(NotFoundError)
 	return ok
 }
 
 // IllegalStateError represents an illegal state error
 // It implements the RuntimeError interface
 type IllegalStateError struct {
-	Msg   string
-	Stack string
-}
-
-// GetStack gets the error stack trace
-func (e IllegalStateError) GetStack() string {
-	return e.Stack
-}
-
-// Error gets the error message
-func (e IllegalStateError) Error() string {
-	return e.Msg
+	BaseError
 }
 
 // NewIllegalStateError creates an IllegalStateError instance
-func NewIllegalStateError(m string) error {
-	s, _ := StackTrace()
-	return IllegalStateError{m, s}
+func NewIllegalStateError(err error) error {
+	return IllegalStateError{NewBaseError(err)}
 }
 
 // IsIllegalStateError verifies if error is an IllegalStateError
-func IsIllegalStateError(e error) bool {
-	_, ok := e.(IllegalStateError)
+func IsIllegalStateError(err error) bool {
+	_, ok := errors.Cause(err).(IllegalStateError)
 	return ok
 }
 
 // IllegalArgumentError represents an illegal argument error
 // It implements the RuntimeError interface
 type IllegalArgumentError struct {
-	Msg   string
-	Stack string
-}
-
-// GetStack gets the error stack trace
-func (e IllegalArgumentError) GetStack() string {
-	return e.Stack
-}
-
-// Error gets the error message
-func (e IllegalArgumentError) Error() string {
-	return e.Msg
+	BaseError
 }
 
 // NewIllegalArgumentError creates an IllegalArgumentError instance
-func NewIllegalArgumentError(m string) error {
-	s, _ := StackTrace()
-	return IllegalArgumentError{m, s}
+func NewIllegalArgumentError(err error) error {
+	return IllegalArgumentError{NewBaseError(err)}
 }
 
-// IsIllegalStateError verifies if error is an IllegalStateError
-func IsIllegalArgumentError(e error) bool {
-	_, ok := e.(IllegalArgumentError)
+// IsIllegalArgumentError verifies if error is an IllegalStateError
+func IsIllegalArgumentError(err error) bool {
+	_, ok := errors.Cause(err).(IllegalStateError)
 	return ok
 }
 
 // RelationshipError represents a relationship error
 type RelationshipError struct {
-	Msg   string
-	Stack string
-}
-
-// GetStack gets the error stack trace
-func (e RelationshipError) GetStack() string {
-	return e.Stack
-}
-
-// Error gets the error messsage
-func (e RelationshipError) Error() string {
-	return e.Msg
+	BaseError
 }
 
 // NewRelationshipError creates an error from RelationshipError
-func NewRelationshipError(m string) error {
-	s, _ := StackTrace()
-	return RelationshipError{m, s}
+func NewRelationshipError(err error) error {
+	return RelationshipError{NewBaseError(err)}
 }
 
 // IsRelationshipError verifies if error is an RelationshipError
-func IsRelationshipError(e error) bool {
-	_, ok := e.(RelationshipError)
+func IsRelationshipError(err error) bool {
+	_, ok := errors.Cause(err).(RelationshipError)
 	return ok
 }
 
-// Returns a copy of the error with the stack trace field populated and any
-// other shared initialization; skips 'skip' levels of the stack trace.
-//
-// NOTE: This panics on any error.
-func stackTrace(skip int) (current, context string) {
-	buf := make([]byte, 128)
-	for {
-		n := runtime.Stack(buf, false)
-		if n < len(buf) {
-			buf = buf[:n]
-			break
-		}
-		buf = make([]byte, len(buf)*2)
-	}
-
-	indexNewline := func(b []byte, start int) int {
-		if start >= len(b) {
-			return len(b)
-		}
-		searchBuf := b[start:]
-		index := bytes.IndexByte(searchBuf, '\n')
-		if index == -1 {
-			return len(b)
-		}
-		return (start + index)
-	}
-
-	var strippedBuf bytes.Buffer
-	index := indexNewline(buf, 0)
-	if index != -1 {
-		strippedBuf.Write(buf[:index])
-	}
-
-	for i := 0; i < skip; i++ {
-		index = indexNewline(buf, index+1)
-		index = indexNewline(buf, index+1)
-	}
-
-	isDone := false
-	startIndex := index
-	lastIndex := index
-	for !isDone {
-		index = indexNewline(buf, index+1)
-		if (index - lastIndex) <= 1 {
-			isDone = true
-		} else {
-			lastIndex = index
-		}
-	}
-	strippedBuf.Write(buf[startIndex:index])
-	return strippedBuf.String(), string(buf[index:])
+// NotAuthorizedError represents the error for not authorized logic
+type NotAuthorizedError struct {
+	BaseError
 }
 
-// StackTrace returns the current stack trace string.
-func StackTrace() (current, context string) {
-	return stackTrace(3)
+// NewNotAuthorizedError creates a NotAuthorizedError instance
+func NewNotAuthorizedError(err error) error {
+	return NotAuthorizedError{NewBaseError(err)}
 }
 
-// CatchStackTrace catchs the error and get the stack trace
-func CatchStackTrace(err error) string {
-	if IsRuntimeError(err) {
-		return err.(RuntimeError).GetStack()
-	}
-	return err.Error()
+// IsNotAuthorizedError verifies if error is an NotAuthorizedError
+func IsNotAuthorizedError(err error) bool {
+	_, ok := errors.Cause(err).(NotAuthorizedError)
+	return ok
 }

@@ -35,28 +35,16 @@ func Connect(c Config) (*sqlx.DB, error) {
 
 // DatabaseError error type for database error
 type DatabaseError struct {
-	Msg   string
-	Stack string
-}
-
-// GetStack gets stack trace error
-func (e DatabaseError) GetStack() string {
-	return e.Stack
-}
-
-// Built-in interface
-func (e DatabaseError) Error() string {
-	return e.Msg
+	errors.BaseError
 }
 
 // NewDatabaseError creates a new DataBaseError instance
-func NewDatabaseError(m string) error {
-	s, _ := errors.StackTrace()
-	return DatabaseError{m, s}
+func NewDatabaseError(err error) error {
+	return DatabaseError{errors.NewBaseError(err)}
 }
 
 // IsDatabaseError verifies if error is an DataBaseError
-func IsDatabaseError(e error) bool {
-	_, ok := e.(DatabaseError)
+func IsDatabaseError(err error) bool {
+	_, ok := errors.Cause(err).(DatabaseError)
 	return ok
 }

@@ -3,8 +3,6 @@ package context
 import (
 	"net/http"
 
-	"fmt"
-
 	"github.com/gorilla/context"
 	"github.com/tralus/koala/errors"
 )
@@ -19,10 +17,8 @@ func Get(r *http.Request, key interface{}) (interface{}, error) {
 	u := context.Get(r, key)
 
 	if u == nil {
-		errMsg := fmt.Sprintf(
-			"Key %s is not in the context.", key,
-		)
-		return nil, errors.NewIllegalStateError(errMsg)
+		err := errors.Errorf("Key %s is not in the context.", key)
+		return nil, errors.NewIllegalStateError(err)
 	}
 
 	return u, nil

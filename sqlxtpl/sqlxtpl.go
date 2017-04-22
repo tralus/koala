@@ -10,31 +10,23 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+const emptyResultData = "Empty Result Data"
+
+const dbError = "Database Error"
+
 // EmptyResultDataError error type for an empty result database
 type EmptyResultDataError struct {
-	Msg   string
-	Stack string
-}
-
-// GetStack gets stack trace error
-func (e EmptyResultDataError) GetStack() string {
-	return e.Stack
-}
-
-// Built-in interface
-func (e EmptyResultDataError) Error() string {
-	return e.Msg
+	errors.BaseError
 }
 
 // NewEmptyResultDataError creates an EmptyResultDataError instance
-func NewEmptyResultDataError(m string) error {
-	s, _ := errors.StackTrace()
-	return EmptyResultDataError{m, s}
+func NewEmptyResultDataError(err error) error {
+	return EmptyResultDataError{errors.NewBaseError(err)}
 }
 
 // IsEmptyResultDataError verifies if error is an EmptyResultDataError
-func IsEmptyResultDataError(e error) bool {
-	_, ok := e.(EmptyResultDataError)
+func IsEmptyResultDataError(err error) bool {
+	_, ok := errors.Cause(err).(EmptyResultDataError)
 	return ok
 }
 
@@ -73,10 +65,12 @@ type ParseRows func(r *sqlx.Rows) error
 func processRows(rows *sqlx.Rows, err error, parse ParseRows) error {
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return NewEmptyResultDataError("Empty result data.")
+			return NewEmptyResultDataError(
+				errors.Wrap(err, "Empty result data."),
+			)
 		}
 
-		return sqlxdb.NewDatabaseError(err.Error())
+		return sqlxdb.NewDatabaseError(errors.Wrap(err, dbError))
 	}
 
 	for rows.Next() {
@@ -118,9 +112,10 @@ func (s SqlxTpl) UnsafeSelect(dest interface{}, query string, args ...interface{
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return NewEmptyResultDataError("Empty result data.")
+			return NewEmptyResultDataError(
+				errors.Wrap(err, emptyResultData))
 		}
-		return sqlxdb.NewDatabaseError(err.Error())
+		return sqlxdb.NewDatabaseError(errors.Wrap(err, dbError))
 	}
 
 	return nil
@@ -132,9 +127,10 @@ func (s SqlxTpl) Select(dest interface{}, query string, args ...interface{}) err
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return NewEmptyResultDataError("Empty result data.")
+			return NewEmptyResultDataError(
+				errors.Wrap(err, emptyResultData))
 		}
-		return sqlxdb.NewDatabaseError(err.Error())
+		return sqlxdb.NewDatabaseError(errors.Wrap(err, dbError))
 	}
 
 	return nil
@@ -146,9 +142,10 @@ func (s SqlxTpl) UnsafeGet(dest interface{}, query string, args ...interface{}) 
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return NewEmptyResultDataError("Empty result data.")
+			return NewEmptyResultDataError(
+				errors.Wrap(err, emptyResultData))
 		}
-		return sqlxdb.NewDatabaseError(err.Error())
+		return sqlxdb.NewDatabaseError(errors.Wrap(err, dbError))
 	}
 
 	return nil
@@ -160,9 +157,10 @@ func (s SqlxTpl) Get(dest interface{}, query string, args ...interface{}) error 
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return NewEmptyResultDataError("Empty result data.")
+			return NewEmptyResultDataError(
+				errors.Wrap(err, emptyResultData))
 		}
-		return sqlxdb.NewDatabaseError(err.Error())
+		return sqlxdb.NewDatabaseError(errors.Wrap(err, dbError))
 	}
 
 	return nil
@@ -178,7 +176,9 @@ func (s *SqlxTpl) TxDo(do func(tx *sqlx.Tx) error) error {
 	tx, err := Begin(s.DB)
 
 	if err != nil {
-		return sqlxdb.NewDatabaseError(err.Error())
+		return sqlxdb.NewDatabaseError(
+			errors.Wrap(err, dbError),
+		)
 	}
 
 	err = do(tx)
@@ -187,10 +187,14 @@ func (s *SqlxTpl) TxDo(do func(tx *sqlx.Tx) error) error {
 		errback := Rollback(tx)
 
 		if errback != nil {
-			return sqlxdb.NewDatabaseError(errback.Error())
+			return sqlxdb.NewDatabaseError(
+				errors.Wrap(errback, dbError),
+			)
 		}
 
-		return sqlxdb.NewDatabaseError(err.Error())
+		return sqlxdb.NewDatabaseError(
+			errors.Wrap(err, dbError),
+		)
 	}
 
 	err = Commit(tx)
@@ -207,7 +211,7 @@ func Begin(db *sqlx.DB) (*sqlx.Tx, error) {
 	tx, err := db.Beginx()
 
 	if err != nil {
-		return nil, sqlxdb.NewDatabaseError(err.Error())
+		return nil, sqlxdb.NewDatabaseError(errors.Wrap(err, dbError))
 	}
 
 	return tx, nil
@@ -222,7 +226,7 @@ func Rollback(tx *sqlx.Tx) error {
 	err := tx.Rollback()
 
 	if err != nil {
-		return sqlxdb.NewDatabaseError(err.Error())
+		return sqlxdb.NewDatabaseError(errors.Wrap(err, dbError))
 	}
 
 	return nil
@@ -237,7 +241,7 @@ func Commit(tx *sqlx.Tx) error {
 	err := tx.Commit()
 
 	if err != nil {
-		return sqlxdb.NewDatabaseError(err.Error())
+		return sqlxdb.NewDatabaseError(errors.Wrap(err, dbError))
 	}
 
 	return nil
@@ -255,7 +259,7 @@ func (s SqlxTpl) NamedExec(query string, arg interface{}) (result sql.Result, er
 	}
 
 	if err != nil {
-		return nil, sqlxdb.NewDatabaseError(err.Error())
+		return nil, sqlxdb.NewDatabaseError(errors.Wrap(err, dbError))
 	}
 
 	return
@@ -264,13 +268,15 @@ func (s SqlxTpl) NamedExec(query string, arg interface{}) (result sql.Result, er
 // TxNamedExec executes the query with a transaction
 func (s SqlxTpl) TxNamedExec(tx *sqlx.Tx, query string, arg interface{}) (sql.Result, error) {
 	if tx == nil {
-		return nil, sqlxdb.NewDatabaseError("Tx is not a valid instance.")
+		return nil, sqlxdb.NewDatabaseError(
+			errors.New("Tx is not a valid instance."))
 	}
 
 	sqlResult, err := tx.NamedExec(query, arg)
 
 	if err != nil {
-		return nil, sqlxdb.NewDatabaseError(err.Error())
+		return nil, sqlxdb.NewDatabaseError(
+			errors.Wrap(err, dbError))
 	}
 
 	return sqlResult, nil
