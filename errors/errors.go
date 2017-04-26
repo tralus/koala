@@ -62,7 +62,7 @@ func Wrap(err error, m string) error {
 
 // Errorf only wraps errors.Errorf
 func Errorf(format string, args ...interface{}) error {
-	return errors.Errorf(format, args)
+	return errors.Errorf(format, args...)
 }
 
 // RootError interface exposes additional information about the error
