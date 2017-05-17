@@ -120,7 +120,7 @@ func (c PostgresCriteria) ILikeBoth(f string, v interface{}) Handler {
 	return c.ilike(f, v, "%%%s%%")
 }
 
-// ilike creates the iike operator to search for a specified pattern in a column
+// ilike creates the ilike operator to search for a specified pattern in a column
 func (c PostgresCriteria) ilike(field string, v interface{}, format string) Handler {
 	return func() (string, NamedBindVars) {
 		query := "%s ILIKE :%s"
