@@ -53,6 +53,18 @@ func (c Criteria) like(field string, v interface{}, format string) Handler {
 	}
 }
 
+// Eq creates the ANSI equals operator
+func (c Criteria) Eq(field string, v interface{}) Handler {
+	return func() (string, NamedBindVars) {
+		query := "%s = :%s"
+		namedVars := makeNamedVars()
+
+		namedVars[field] = v
+
+		return sprintf(query, field, field), namedVars
+	}
+}
+
 // Add adds a criteria handler
 func (c *Criteria) Add(h Handler) {
 	s, namedVars := h()
@@ -103,13 +115,13 @@ func NewPostgresCriteria() PostgresCriteria {
 	return PostgresCriteria{New()}
 }
 
-// BothILike creates the like operator with value "%...%"
+// ILikeBoth creates the like operator with "%...%"
 func (c PostgresCriteria) ILikeBoth(f string, v interface{}) Handler {
-	return c.like(f, v, "%%%s%%")
+	return c.ilike(f, v, "%%%s%%")
 }
 
-// Like creates the ANSI like operator to search for a specified pattern in a column
-func (c PostgresCriteria) like(field string, v interface{}, format string) Handler {
+// ilike creates the iike operator to search for a specified pattern in a column
+func (c PostgresCriteria) ilike(field string, v interface{}, format string) Handler {
 	return func() (string, NamedBindVars) {
 		query := "%s ILIKE :%s"
 		namedVars := makeNamedVars()
