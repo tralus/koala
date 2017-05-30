@@ -60,16 +60,16 @@ func ClaimsToContext(r *http.Request, c *jwt.StandardClaims) {
 }
 
 // ClaimsFromContext gets claims from the request context
-func ClaimsFromContext(r *http.Request) (jwt.StandardClaims, error) {
-	var claims jwt.StandardClaims
+func ClaimsFromContext(r *http.Request) (*jwt.StandardClaims, error) {
+	var claims *jwt.StandardClaims
 
 	value, err := context.Get(r, keyJwtClaimsContext)
 
-	if err == nil {
+	if err != nil {
 		return claims, err
 	}
 
-	claims, ok := value.(jwt.StandardClaims)
+	claims, ok := value.(*jwt.StandardClaims)
 
 	if !ok {
 		errMsg := "The claims in the context is not a StandardClaims instance."
