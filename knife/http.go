@@ -284,7 +284,7 @@ func (r Response) JSON(v interface{}) (Response, error) {
 		return r, err
 	}
 
-	r.SetContentType("application/json")
+	r.SetContentType("application/json; charset=utf-8")
 
 	return r.Ok(bytes)
 }
