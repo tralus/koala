@@ -13,6 +13,9 @@ import (
 // Config holds the app config
 var Config config.Config
 
+// ServerPort holds the server port
+var ServerPort string
+
 func init() {
 	var err error
 
@@ -83,18 +86,18 @@ func (a *App) Run() error {
 		m.Up()
 	}
 
-	port := os.Getenv("PORT")
+	ServerPort := os.Getenv("PORT")
 
-	if len(port) == 0 {
-		port = "9003"
+	if len(ServerPort) == 0 {
+		ServerPort = "9003"
 	}
 
 	fmt.Println(sep())
 	fmt.Printf("Debug: %t\n", Config.Debug)
-	fmt.Printf("Port: %s\n", port)
+	fmt.Printf("Port: %s\n", ServerPort)
 
 	fmt.Println(sep())
-	fmt.Printf("On http://localhost:%s\n", port)
+	fmt.Printf("On http://localhost:%s\n", ServerPort)
 	fmt.Println("To shut down, press <CTRL> + C.")
 
 	// Starts the router
@@ -103,10 +106,12 @@ func (a *App) Run() error {
 	if a.cors != nil {
 		// Starts the server with CORS support
 		return http.ListenAndServe(
-			fmt.Sprintf(":%s", port), a.cors.Handler(handler))
+			fmt.Sprintf(":%s", ServerPort),
+			a.cors.Handler(handler),
+		)
 	}
 
 	// Starts the server
 	return http.ListenAndServe(
-		fmt.Sprintf(":%s", port), handler)
+		fmt.Sprintf(":%s", ServerPort), handler)
 }
